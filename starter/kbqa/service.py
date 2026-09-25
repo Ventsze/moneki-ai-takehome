@@ -25,6 +25,18 @@ from .trace import Trace, TraceStore
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _INT_PARAMS = {"top_k", "limit"}
 
+#: 安全闸门：文档内容只当资料用，不当指令执行；数据库只读。
+#: 删改数据、注入式指令、索要系统内部信息，一律拒绝。
+_HARMFUL_PATTERNS = (
+    re.compile(r"删(除|掉|了|掉它)|清空|清掉|抹掉|清除"),
+    re.compile(r"(修改|更新|覆盖|写入|导入|插入|撤销|作废).{0,10}(记录|数据|订单|表|库存|排班)"),
+    re.compile(r"\b(drop\s+table|delete\s+from|truncate\s+table|update\s+\w+\s+set|insert\s+into)\b", re.I),
+    re.compile(r"(系统提示词|system\s*prompt|初始指令|预设指令)", re.I),
+    re.compile(r"(表结构|库表|schema|数据库.{0,6}(结构|定义))", re.I),
+    re.compile(r"忽略.{0,8}(之前|以上|上面|先前|所有).{0,8}(规则|指令|提示|设定)"),
+    re.compile(r"(你是|假装你是|现在你是).{0,12}(管理员|root|开发者| unrestricted)", re.I),
+)
+
 
 class Service:
     def __init__(self, settings: Optional[Settings] = None) -> None:
@@ -153,9 +165,18 @@ class Service:
         try:
             if not question.strip():
                 return Answer(answer="没有收到问题内容，请再说一次。", answer_type="clarify")
+            harm = _harmful_reason(question)
+            if harm:
+                trace.step("safety_gate", {"reason": harm})
+                return Answer(
+                    answer="这个要求我不能执行：%s。本系统只能查询数据与检索文档，"
+                    "数据库不会做任何改动，内部配置也不对外提供。" % harm,
+                    answer_type="refusal",
+                    notes=["安全闸门：%s" % harm],
+                )
             history = self.sessions.history(session_id)
             started = time.perf_counter()
-            plan = self.planner.plan(question)
+            plan = self.planner.plan(question, history)
             trace.step("plan", plan.as_trace(), started=started)
             answer = self._run_engine(plan, trace, history)
             self.sessions.append(
@@ -214,6 +235,15 @@ class Service:
 
     def get_trace(self, trace_id: str) -> Optional[dict]:
         return self.traces.get(trace_id)
+
+
+def _harmful_reason(question: str) -> Optional[str]:
+    """命中安全闸门时返回人话原因，否则 None。"""
+    for pattern in _HARMFUL_PATTERNS:
+        match = pattern.search(question)
+        if match:
+            return "检测到删改数据或索取内部信息的指令（%s…）" % match.group(0)[:20]
+    return None
 
 
 def _reason_cn(exc: LLMError) -> str:

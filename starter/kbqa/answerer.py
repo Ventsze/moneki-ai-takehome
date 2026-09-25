@@ -24,8 +24,8 @@ VOCAB_SOFT_GATE = 0.45
 RETRIEVAL_SOFT_GATE = 12.0
 #: 问得太泛时的反问阈值：检索连一个像样的命中都没有。
 CLARIFY_SCORE = 8.0
-#: 拼给作答用的资料最长多少字，太长了没必要。
-MAX_CONTEXT_CHARS = 200
+#: 拼进回答的正文最长多少字：一段能读的话，不是把文档倒给用户。
+MAX_CONTEXT_CHARS = 600
 
 
 class Answerer(HybridAnswers):
@@ -351,4 +351,6 @@ class Answerer(HybridAnswers):
                 answer_type="clarify",
                 notes=["检索最高分 %.1f，且问题里没有指标、时间或门店" % top_score],
             )
-        return Answer(answer=self._context(result) + body, answer_type="doc", citations=citations)
+        # 只回引用句组装的正文，不把命中文档的全文倒给用户；
+        # 原文事实都在 citations 里逐字可查。
+        return Answer(answer=body, answer_type="doc", citations=citations)

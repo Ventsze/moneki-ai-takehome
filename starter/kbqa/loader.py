@@ -78,11 +78,29 @@ class Document:
 
 
 _HTML_TITLE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
+_SCRIPT_STYLE_RE = re.compile(r"<(script|style)\b.*?</\1>", re.S | re.I)
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
-def decode_bytes(raw: bytes, path: Path, warnings: list[str]) -> str:
-    """统一按 UTF-8 读。个别老文件里有怪字符，忽略掉就行，不影响检索。"""
-    return raw.decode("utf-8", errors="ignore")
+def html_to_text(text: str) -> str:
+    """html 只留可见正文：去掉 script/style 与全部标签，还原实体。
+
+    引用要逐字核对，核对方读到的"原文"就是这个可见正文，
+    所以入库文本必须用同一套规则生成。
+    """
+    text = _SCRIPT_STYLE_RE.sub(" ", text)
+    text = _TAG_RE.sub(" ", text)
+    return html_module.unescape(text)
+
+
+def decode_bytes(raw: bytes) -> str:
+    """先试 UTF-8，失败再试 GB18030：旧 OA 导出的 .txt 是 GBK 编码。"""
+    for encoding in ("utf-8", "gb18030"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 def parse_front_matter(text: str) -> tuple[dict, str]:
@@ -169,7 +187,7 @@ def load_document(path: Path) -> Optional[Document]:
     """读一个文件。不是知识库文档（没有 KB 编号）时返回 None。"""
     warnings: list[str] = []
     raw = path.read_bytes()
-    text = decode_bytes(raw, path, warnings)
+    text = decode_bytes(raw)
     suffix = path.suffix.lower()
     fmt = {".md": "md", ".markdown": "md", ".txt": "txt"}.get(suffix, "html")
 
@@ -177,10 +195,11 @@ def load_document(path: Path) -> Optional[Document]:
     if fmt == "md":
         meta, text = parse_front_matter(text)
     elif fmt == "html":
-        # html 直接按文本入库，标签也就那么几个，BM25 自己会忽略。
+        # html 去标签后入库：检索与引用都走可见正文。
         match_title = _HTML_TITLE.search(text)
         html_title = html_module.unescape(match_title.group(1).strip()) if match_title else ""
         meta = {"title": html_title.split("-")[0].strip() or html_title}
+        text = html_to_text(text)
 
     match = _DOC_ID.match(path.name)
     doc_id = str(meta.get("doc_id") or (match.group(1) if match else "")).strip()

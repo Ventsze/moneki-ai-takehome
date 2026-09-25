@@ -9,6 +9,17 @@ from .entities import focus_kinds
 from .tokenizer import STOP_CHARS, content_tokens, tokenize
 from .units import MAX_QUOTE, Unit, UnitIndex
 
+#: 逐字比对的归一规则：NFKC + 去 Markdown 噪声 + 去全部空白 + casefold。
+_MD_NOISE = str.maketrans({"*": None, "`": None, "|": None, "#": None, ">": None, "\u200b": None})
+
+
+def _normalize_quote(text: str) -> str:
+    import unicodedata
+
+    normalized = unicodedata.normalize("NFKC", text or "")
+    return "".join(normalized.translate(_MD_NOISE).split()).casefold()
+
+
 MARKERS = {"✓", "✔", "√", "有", "×", "✗", "—", "-", "无", "N/A"}
 
 #: 一句话里有没有“问句要的那种东西”。问句焦点是钱就找金额，是原因就找因果说明，
@@ -230,8 +241,14 @@ class DocFacts:
         return unit
 
     def verbatim(self, doc_id: str, quote: str) -> bool:
-        source = re.sub(r"\s+", "", self.index.texts.get(doc_id, ""))
-        return re.sub(r"\s+", "", quote) in source
+        """quote 必须是文档原文里的连续文字。
+
+        归一规则（NFKC + 去 Markdown 噪声字符 + 去全部空白 + casefold）
+        对文档与 quote 一视同仁，与评审方的逐字核对保持一致。
+        """
+        return _normalize_quote(quote) in _normalize_quote(
+            self.index.texts.get(doc_id, "")
+        )
 
     def cite(self, doc_id: str, quote: str) -> Optional[dict]:
         quote = quote.strip()
