@@ -113,3 +113,22 @@ class TestDocAnswerShape:
         assert body["answer_type"] == "doc"
         assert len(body["answer"]) <= 1200
         assert body["citations"], "文档回答必须有引用"
+
+
+class TestDocBlockOrdering:
+    def test_doc_block_prefers_best_candidate(self, client):
+        """引用句必须按候选得分降序选（V01：活动价 ¥29 才是答案）。"""
+        body = client.post(
+            "/api/chat",
+            json={"session_id": "v01", "question": "今年 618 做活动的是哪个商品，活动价多少？"},
+        ).json()
+        assert "29" in body["answer"]
+        assert any(c["doc_id"] == "KB-023" for c in body["citations"])
+
+    def test_current_version_preferred(self, client):
+        """问现行赠送规则，引用要含“赠送 60 元”这句（V02）。"""
+        body = client.post(
+            "/api/chat",
+            json={"session_id": "v02", "question": "储值充值现在的赠送规则是什么？"},
+        ).json()
+        assert "60" in body["answer"]
