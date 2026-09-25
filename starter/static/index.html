@@ -81,6 +81,20 @@
   .trace-steps { margin: 10px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
   .trace-steps li { margin: 2px 0; }
   .trace-steps code { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .alert-banner { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-banner h2 { color: var(--warn); }
+  .alert-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px dashed #fed7aa; font-size: 13px; }
+  .alert-item:first-of-type { border-top: 0; }
+  .alert-tag { flex: none; font-size: 11px; border-radius: 12px; padding: 1px 9px; background: #ffedd5; color: var(--warn); }
+  .alert-item .q { flex: 1; color: var(--muted); }
+  .alert-item button { flex: none; border: 0; background: var(--warn); color: #fff; border-radius: 7px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+  .presets { display: flex; gap: 6px; }
+  .presets span { font-size: 12px; color: var(--brand); background: var(--brand-soft); border-radius: 12px; padding: 3px 10px; cursor: pointer; }
+  .compare-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .cmp { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .cmp .k { font-size: 12px; color: var(--muted); }
+  .cmp .v { font-size: 17px; font-weight: 600; margin-top: 2px; }
+  .up { color: var(--good); } .down { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -95,9 +109,20 @@
     <div><label>门店</label><select id="f-store"><option value="">全部门店</option></select></div>
     <div><label>商品（Top 榜用）</label><select id="f-product"><option value="">全部商品</option></select></div>
     <button id="apply">查询</button>
+    <div class="presets" id="presets">
+      <span data-days="7">近 7 天</span><span data-days="30">近 30 天</span>
+      <span data-preset="current">全部数据</span><span data-preset="prev-month">上月</span>
+    </div>
+  </div>
+
+  <div class="alert-banner" id="alert-banner" style="display:none">
+    <h2>⚠ 运营预警</h2>
+    <div id="alert-list"></div>
   </div>
 
   <div class="cards" id="summary-cards"></div>
+
+  <div class="compare-strip" id="compare-strip"></div>
 
   <div class="grid2">
     <div class="panel"><h2>净营业额趋势</h2><div id="trend"></div></div>
@@ -206,6 +231,49 @@ async function loadTop() {
     ${rows.join("") || "<tr><td colspan=7>没有数据</td></tr>"}</table>`;
 }
 
+async function loadCompare() {
+  const p = params();
+  const body = await (await fetch("/api/metrics/compare?" + new URLSearchParams(p))).json();
+  const cell = (label, cur, prev, fmt) => {
+    const d = cur - prev;
+    const cls = d > 0 ? "up" : d < 0 ? "down" : "";
+    const sign = d > 0 ? "+" : "";
+    return `<div class="cmp"><div class="k">${label} 环比</div><div class="v">${fmt(cur)}</div>
+      <div class="${cls}" style="font-size:12px">${sign}${fmt(d).replace("¥", "")} vs 上一等长区间</div></div>`;
+  };
+  const pctCell = (label, pct) => {
+    const cls = pct > 0 ? "up" : pct < 0 ? "down" : "";
+    return `<div class="cmp"><div class="k">${label} 环比</div><div class="v ${cls}">${pct > 0 ? "+" : ""}${pct}%</div><div style="font-size:12px;color:var(--muted)">vs 上一等长区间</div></div>`;
+  };
+  $("compare-strip").innerHTML =
+    cell("净营业额", body.period_b.net_revenue, body.period_a.net_revenue, (v) => "¥" + fmtMoney(v)) +
+    pctCell("净营业额", body.delta.net_revenue.pct) +
+    pctCell("订单数", body.delta.orders.pct) +
+    pctCell("销量", body.delta.qty.pct);
+}
+
+const KIND_CN = { closed_day: "营业中断", month_drop: "环比骤跌", refund_spike: "退款集中" };
+async function loadAnomalies() {
+  const body = await (await fetch("/api/anomalies")).json();
+  const items = body.anomalies || [];
+  if (!items.length) { $("alert-banner").style.display = "none"; return; }
+  $("alert-banner").style.display = "";
+  $("alert-list").innerHTML = items.map((a) => `
+    <div class="alert-item">
+      <span class="alert-tag">${KIND_CN[a.kind] || a.kind}</span>
+      <b>${esc(a.store_id || "")} ${esc(a.date)}</b>
+      <span class="q">${esc(
+        a.kind === "month_drop" ? "净营业额环比 " + a.detail.pct + "%"
+        : a.kind === "refund_spike" ? "当日退款 ¥" + fmtMoney(a.detail.refund)
+        : (a.detail?.note || "")
+      )}</span>
+      <button data-q="${esc(a.question)}">问 AI 为什么</button>
+    </div>`).join("");
+  document.querySelectorAll(".alert-item button").forEach((btn) => {
+    btn.onclick = () => ask(btn.dataset.q);
+  });
+}
+
 async function loadDQ() {
   const dq = await (await fetch("/api/data_quality")).json();
   const cr = dq.cleaning_report || {};
@@ -262,12 +330,33 @@ async function loadTrace(traceId) {
     steps.map((s) => `<li>${esc(s.step || s.name || "?")} <code>${(s.ms ?? s.elapsed_ms ?? 0)}ms</code></li>`).join("");
 }
 
-$("apply").onclick = () => { loadSummary(); loadTrend(); loadTop(); };
+$("apply").onclick = () => { loadSummary(); loadTrend(); loadTop(); loadCompare(); };
+document.querySelectorAll("#presets span").forEach((el) => {
+  el.onclick = () => {
+    const end = new Date(meta.data_period.end + "T00:00:00");
+    if (el.dataset.days) {
+      const start = new Date(end);
+      start.setDate(start.getDate() - Number(el.dataset.days) + 1);
+      $("f-start").value = start.toISOString().slice(0, 10);
+      $("f-end").value = meta.data_period.end;
+    } else if (el.dataset.preset === "current") {
+      $("f-start").value = meta.data_period.start;
+      $("f-end").value = meta.data_period.end;
+    } else if (el.dataset.preset === "prev-month") {
+      const d = new Date(end);
+      d.setDate(1); d.setDate(d.getDate() - 1);
+      const last = d.toISOString().slice(0, 10);
+      $("f-start").value = last.slice(0, 8) + "01";
+      $("f-end").value = last;
+    }
+    loadSummary(); loadTrend(); loadTop(); loadCompare();
+  };
+});
 $("chat-send").onclick = () => { const q = $("chat-q").value.trim(); if (q) { ask(q); $("chat-q").value = ""; } };
 $("chat-q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("chat-send").click(); });
 document.querySelectorAll(".chat-samples span").forEach((el) => { el.onclick = () => ask(el.textContent); });
 
-loadMeta().then(() => { loadSummary(); loadTrend(); loadTop(); loadDQ(); });
+loadMeta().then(() => { loadSummary(); loadTrend(); loadTop(); loadDQ(); loadCompare(); loadAnomalies(); });
 </script>
 </body>
 </html>

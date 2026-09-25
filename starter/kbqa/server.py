@@ -111,6 +111,22 @@ def meta() -> dict:
     return service().meta()
 
 
+@app.get("/api/metrics/compare")
+def metrics_compare(
+    start: str = Query(...),
+    end: str = Query(...),
+    store_id: Optional[str] = None,
+):
+    bad = _bad_date(start, end)
+    return bad or service().metrics_compare(start, end, store_id)
+
+
+@app.get("/api/anomalies")
+def anomalies() -> dict:
+    """运营预警：营业中断 / 月度环比骤跌 / 退款集中，每条带可直接追问 AI 的问题。"""
+    return service().anomalies()
+
+
 @app.post("/api/retrieve")
 def retrieve(request: RetrieveRequest) -> dict:
     return service().retrieve(_as_text(request.query), request.top_k)

@@ -281,6 +281,37 @@ class DataTools:
         items.sort(key=lambda item: item["net_revenue"], reverse=True)
         return {"start": start, "end": end, "categories": items}
 
+    def day_store_revenue(self, start: str, end: str) -> list[dict]:
+        """每天每家门店的净销售额（分），供预警扫描用。"""
+        rows = self.conn.execute(
+            """
+            SELECT store_id, date, SUM(amount_cents) AS net_cents
+            FROM sales_clean WHERE date >= ? AND date <= ?
+            GROUP BY store_id, date
+            """,
+            (start, end),
+        ).fetchall()
+        return [
+            {"store_id": r["store_id"], "date": r["date"], "net_cents": int(r["net_cents"])}
+            for r in rows
+        ]
+
+    def refund_spikes(self, start: str, end: str, min_cents: int) -> list[dict]:
+        """单店单日退款金额达到阈值的记录。"""
+        rows = self.conn.execute(
+            """
+            SELECT store_id, date, SUM(-amount_cents) AS refund_cents
+            FROM sales_clean WHERE amount_cents < 0 AND date >= ? AND date <= ?
+            GROUP BY store_id, date HAVING refund_cents >= ?
+            ORDER BY refund_cents DESC
+            """,
+            (start, end, min_cents),
+        ).fetchall()
+        return [
+            {"store_id": r["store_id"], "date": r["date"], "refund_cents": int(r["refund_cents"])}
+            for r in rows
+        ]
+
     def first_sale_date(self, product_id: str) -> Optional[str]:
         row = self.conn.execute(
             "SELECT MIN(date) FROM sales_clean WHERE product_id = ? AND is_refund = 0",

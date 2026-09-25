@@ -8,10 +8,9 @@ class TestCompare:
         body = real_client.get(
             "/api/metrics/compare", params={"start": "2026-06-01", "end": "2026-06-30"}
         ).json()
-        assert body["current"]["net_revenue"] == 156757.0
-        assert body["previous"]["net_revenue"] == 162338.0  # 5/2–5/31，独立 SQL 验证
-        # 环比涨跌幅方向正确：6 月比 5 月（前 30 天 5/2–5/31）涨
-        assert body["delta"]["net_revenue"]["direction"] in ("涨", "跌", "持平")
+        assert body["period_b"]["net_revenue"] == 156757.0   # 6 月（当前区间）
+        assert body["period_a"]["net_revenue"] == 162338.0  # 5/2–5/31，独立 SQL 验证
+        assert body["delta"]["net_revenue"]["pct"] == -3.44
         assert body["current_window"] == ["2026-06-01", "2026-06-30"]
         assert body["previous_window"] == ["2026-05-02", "2026-05-31"]
 

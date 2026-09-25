@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import date
 from typing import Any, Optional
 
 from .answerer import Answerer
@@ -99,6 +100,115 @@ class Service:
 
     def metrics_top(self, start: str, end: str, store_id=None, limit: int = 10) -> dict:
         return self.tools.top_products(start, end, store_id, limit)
+
+    def metrics_compare(self, start: str, end: str, store_id=None) -> dict:
+        """所选区间 vs 之前等长区间的环比。"""
+        from datetime import timedelta
+
+        start_d = date.fromisoformat(start)
+        end_d = date.fromisoformat(end)
+        length = (end_d - start_d).days + 1
+        prev_end = start_d - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=length - 1)
+        result = self.tools.compare_periods(
+            prev_start.isoformat(), prev_end.isoformat(), start, end, store_id
+        )
+        result["current_window"] = [start, end]
+        result["previous_window"] = [prev_start.isoformat(), prev_end.isoformat()]
+        return result
+
+    def anomalies(self) -> dict:
+        """运营预警：营业中断、月度环比骤跌、退款集中，每条附可直接追问 AI 的问题。"""
+        from datetime import timedelta
+
+        period_start = date.fromisoformat(self.data_period["start"])
+        period_end = date.fromisoformat(self.data_period["end"])
+        stores = [s["store_id"] for s in self.tools.stores()]
+        per_store_day = {}
+        for row in self.tools.day_store_revenue(period_start.isoformat(), period_end.isoformat()):
+            per_store_day[(row["store_id"], row["date"])] = row["net_cents"]
+        all_days = sorted({day for _, day in per_store_day})
+
+        anomalies: list[dict] = []
+
+        # 营业中断：某店某日无明细，但该店前后 7 天内都在正常营业。
+        # 窗口取 7 天是为了覆盖连续多日的停业（如 S03 六月连停 4 天）：
+        # 中段的日子两侧紧邻日都没有销售，只有看远一点才知道店还开着。
+        GAP_WINDOW = 7
+        open_days: dict[str, set[str]] = {store: set() for store in stores}
+        for store, day in per_store_day:
+            open_days[store].add(day)
+        for store in stores:
+            days = open_days[store]
+            if not days:
+                continue
+            cursor = date.fromisoformat(min(days))
+            last = date.fromisoformat(max(days))
+            while cursor <= last:
+                day = cursor.isoformat()
+                if day not in days:
+                    before = any(
+                        (cursor - timedelta(days=back)).isoformat() in days
+                        for back in range(1, GAP_WINDOW + 1)
+                    )
+                    after = any(
+                        (cursor + timedelta(days=fwd)).isoformat() in days
+                        for fwd in range(1, GAP_WINDOW + 1)
+                    )
+                    if before and after:
+                        anomalies.append(
+                            {
+                                "kind": "closed_day",
+                                "store_id": store,
+                                "date": day,
+                                "detail": {"note": "前后 7 天内均有销售，当日没有任何明细"},
+                                "question": "%s 这家门店 %s 为什么没有任何营业额？"
+                                % (store, day),
+                            }
+                        )
+                cursor += timedelta(days=1)
+
+        # 月度环比骤跌：同一门店相邻自然月净营业额跌幅 ≥ 15%。
+        monthly: dict[tuple[str, str], float] = {}
+        for (store, day), cents in per_store_day.items():
+            monthly[(store, day[:7])] = monthly.get((store, day[:7]), 0.0) + cents / 100.0
+        months = sorted({ym for _, ym in monthly})
+        for (store, ym), net in sorted(monthly.items()):
+            prev_ym_index = months.index(ym) - 1
+            if prev_ym_index < 0:
+                continue
+            prev = monthly.get((store, months[prev_ym_index]), 0.0)
+            if prev <= 0:
+                continue
+            pct = round((net - prev) / prev * 100, 1)
+            if pct <= -15:
+                anomalies.append(
+                    {
+                        "kind": "month_drop",
+                        "store_id": store,
+                        "date": ym,
+                        "detail": {"pct": pct, "current": net, "previous": prev},
+                        "question": "%s %s 的营业额为什么比 %s 低这么多？"
+                        % (store, ym, months[prev_ym_index]),
+                    }
+                )
+
+        # 退款集中：单店单日退款 ≥ 75 元（数据期内的显著离群值）。
+        for row in self.tools.refund_spikes(period_start.isoformat(), period_end.isoformat(), 7500):
+            anomalies.append(
+                {
+                    "kind": "refund_spike",
+                    "store_id": row["store_id"],
+                    "date": row["date"],
+                    "detail": {"refund": row["refund_cents"] / 100.0},
+                    "question": "%s %s 为什么退了 %.0f 元？"
+                    % (row["store_id"], row["date"], row["refund_cents"] / 100.0),
+                }
+            )
+
+        severity = {"closed_day": 0, "month_drop": 1, "refund_spike": 2}
+        anomalies.sort(key=lambda a: (severity[a["kind"]], a["date"]))
+        return {"anomalies": anomalies, "generated_for": self.data_period}
 
     def meta(self) -> dict:
         """看板首屏要用的静态元信息：筛选下拉、默认区间。"""
