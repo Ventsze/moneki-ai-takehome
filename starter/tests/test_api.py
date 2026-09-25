@@ -86,3 +86,21 @@ def test_chat_trace_id(client):
 
 def test_trace_unknown(client):
     assert client.get("/api/trace/nope").status_code == 404
+
+
+def test_meta_stores_products(client):
+    response = client.get("/api/meta")
+    assert response.status_code == 200
+    body = response.json()
+    assert {"today", "data_period", "stores", "products"} <= set(body)
+    assert len(body["stores"]) == 5 and len(body["products"]) >= 20
+
+
+def test_metrics_top_products(client):
+    response = client.get(
+        "/api/metrics/top", params={"start": "2026-06-01", "end": "2026-06-30", "limit": 10}
+    )
+    assert response.status_code == 200
+    products = response.json()["products"]
+    assert 0 < len(products) <= 10
+    assert "net_revenue" in products[0]

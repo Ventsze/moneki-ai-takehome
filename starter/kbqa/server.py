@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .service import Service
 
 app = FastAPI(title="经营看板 + 问答服务", version="0.9.3")
 _service: Optional[Service] = None
+
+_STATIC = Path(__file__).resolve().parents[1] / "static"
+
+
+@app.get("/")
+def index():
+    """看板前端（单文件，无构建步骤）。"""
+    return FileResponse(_STATIC / "index.html")
 
 
 def service() -> Service:
@@ -84,6 +93,22 @@ def metrics_daily(
 ):
     bad = _bad_date(start, end)
     return bad or service().metrics_daily(start, end, store_id, product_id)
+
+
+@app.get("/api/metrics/top")
+def metrics_top(
+    start: str = Query(...),
+    end: str = Query(...),
+    store_id: Optional[str] = None,
+    limit: int = Query(10, ge=1, le=50),
+):
+    bad = _bad_date(start, end)
+    return bad or service().metrics_top(start, end, store_id, limit)
+
+
+@app.get("/api/meta")
+def meta() -> dict:
+    return service().meta()
 
 
 @app.post("/api/retrieve")

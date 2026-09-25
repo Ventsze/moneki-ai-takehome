@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>合味餐饮 · 经营看板</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card: #ffffff; --ink: #1f2933; --muted: #6b7683;
+    --line: #e4e9f0; --brand: #2563eb; --brand-soft: #eff4ff;
+    --good: #16855b; --bad: #c2410c; --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 14px 28px; display: flex; align-items: baseline; gap: 14px;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px 28px 60px; }
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .filters label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .filters select, .filters input {
+    border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
+    font-size: 13px; background: #fff; min-width: 130px;
+  }
+  .filters button {
+    background: var(--brand); color: #fff; border: 0; border-radius: 7px;
+    padding: 7px 18px; font-size: 13px; cursor: pointer;
+  }
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 16px;
+  }
+  .card .k { color: var(--muted); font-size: 12px; }
+  .card .v { font-size: 22px; font-weight: 600; margin-top: 2px; }
+  .card .v small { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 10px; }
+  .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-block; border-radius: 20px; padding: 1px 9px; font-size: 11px;
+    background: var(--brand-soft); color: var(--brand); margin-left: 6px;
+  }
+  .dq-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
+  .dq-list li { margin: 3px 0; }
+  .dq-list b { color: var(--bad); font-weight: 600; }
+  .kv { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  /* 聊天 */
+  .chat-log { display: flex; flex-direction: column; gap: 12px; max-height: 480px; overflow-y: auto; padding: 4px 2px; }
+  .msg { max-width: 92%; border-radius: 10px; padding: 10px 13px; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: #f0f3f8; border-bottom-left-radius: 3px; }
+  .msg .type { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .msg .cites { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 7px; font-size: 12.5px; }
+  .msg .cites .doc { color: var(--brand); font-weight: 600; }
+  .msg .cites blockquote { margin: 4px 0; padding: 4px 10px; border-left: 3px solid var(--brand); background: #fff; color: var(--ink); }
+  .msg details { margin-top: 7px; font-size: 12px; color: var(--muted); }
+  .msg details pre { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; overflow-x: auto; font-size: 11.5px; }
+  .chat-input { display: flex; gap: 8px; margin-top: 12px; }
+  .chat-input input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; }
+  .chat-input button { background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 0 22px; cursor: pointer; }
+  .chat-samples { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chat-samples span { font-size: 12px; color: var(--brand); background: var(--brand-soft); border-radius: 14px; padding: 3px 11px; cursor: pointer; }
+  .trace-steps { margin: 10px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+  .trace-steps li { margin: 2px 0; }
+  .trace-steps code { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>合味餐饮 · 经营看板</h1>
+  <span class="sub" id="head-sub">加载中…</span>
+</header>
+<main>
+  <div class="filters">
+    <div><label>开始日期</label><input type="date" id="f-start"></div>
+    <div><label>结束日期</label><input type="date" id="f-end"></div>
+    <div><label>门店</label><select id="f-store"><option value="">全部门店</option></select></div>
+    <div><label>商品（Top 榜用）</label><select id="f-product"><option value="">全部商品</option></select></div>
+    <button id="apply">查询</button>
+  </div>
+
+  <div class="cards" id="summary-cards"></div>
+
+  <div class="grid2">
+    <div class="panel"><h2>净营业额趋势</h2><div id="trend"></div></div>
+    <div class="panel">
+      <h2>数据质量</h2>
+      <ul class="dq-list" id="dq-list"></ul>
+      <div class="kv" id="dq-kv"></div>
+    </div>
+  </div>
+
+  <div class="panel"><h2>Top 10 商品（按净营业额）</h2><div id="top-table"></div></div>
+
+  <div class="panel">
+    <h2>AI 助手 <span class="badge" id="llm-mode"></span></h2>
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chat-input">
+      <input id="chat-q" placeholder="问点什么，例如：S03 六月第二周营业额为什么这么低？">
+      <button id="chat-send">发送</button>
+    </div>
+    <div class="chat-samples">
+      <span>牛肉poke 六月卖了多少钱？</span>
+      <span>外卖订单多久内可以退款？</span>
+      <span>618 当天 S02 的牛肉poke 卖了多少份，达到目标了吗？</span>
+      <span>储值充值现在的赠送规则是什么？</span>
+    </div>
+    <ol class="trace-steps" id="trace-steps"></ol>
+  </div>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const session = "ui-" + Math.random().toString(36).slice(2, 10);
+let meta = null;
+
+const fmtMoney = (v) => Number(v).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function loadMeta() {
+  meta = await (await fetch("/api/meta")).json();
+  const { start, end } = meta.data_period;
+  $("f-start").value = start; $("f-end").value = end;
+  $("head-sub").textContent = "系统日期 " + meta.today + " · 数据区间 " + start + " ~ " + end;
+  for (const s of meta.stores) {
+    $("f-store").insertAdjacentHTML("beforeend", `<option value="${esc(s.store_id)}">${esc(s.store_id)} ${esc(s.store_name)}</option>`);
+  }
+  for (const p of meta.products) {
+    $("f-product").insertAdjacentHTML("beforeend", `<option value="${esc(p.product_id)}">${esc(p.product_id)} ${esc(p.product_name)}</option>`);
+  }
+}
+
+function params() {
+  const p = { start: $("f-start").value, end: $("f-end").value };
+  if ($("f-store").value) p.store_id = $("f-store").value;
+  if ($("f-product").value) p.product_id = $("f-product").value;
+  return p;
+}
+
+async function loadSummary() {
+  const body = await (await fetch("/api/metrics/summary?" + new URLSearchParams(params()))).json();
+  $("summary-cards").innerHTML = [
+    ["净营业额", "¥" + fmtMoney(body.net_revenue)],
+    ["退款金额", "¥" + fmtMoney(body.refund_amount)],
+    ["有效订单", body.orders.toLocaleString() + " <small>单</small>"],
+    ["客单价", body.aov == null ? "—" : "¥" + body.aov.toFixed(2)],
+    ["销量", body.qty.toLocaleString() + " <small>件</small>"],
+  ].map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+
+async function loadTrend() {
+  const body = await (await fetch("/api/metrics/daily?" + new URLSearchParams(params()))).json();
+  const days = body.days.filter((d) => d.date);
+  const W = 800, H = 240, PAD = { l: 64, r: 14, t: 14, b: 30 };
+  $("trend").innerHTML = "";
+  if (!days.length) { $("trend").textContent = "该区间没有数据"; return; }
+  const max = Math.max(...days.map((d) => d.net_revenue), 1);
+  const x = (i) => PAD.l + (W - PAD.l - PAD.r) * (days.length === 1 ? 0.5 : i / (days.length - 1));
+  const y = (v) => H - PAD.b - (H - PAD.t - PAD.b) * (v / max);
+  const pts = days.map((d, i) => `${x(i).toFixed(1)},${y(d.net_revenue).toFixed(1)}`);
+  const gridY = [0, 0.25, 0.5, 0.75, 1].map((r) => [y(max * r), fmtMoney(max * r)]);
+  const ticks = [];
+  const step = Math.max(1, Math.ceil(days.length / 8));
+  days.forEach((d, i) => { if (i % step === 0) ticks.push(`<text x="${x(i)}" y="${H - 8}" font-size="10" fill="#6b7683" text-anchor="middle">${d.date.slice(5)}</text>`); });
+  $("trend").innerHTML = `
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2563eb" stop-opacity=".22"/><stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${gridY.map(([yy, label]) => `<line x1="${PAD.l}" y1="${yy}" x2="${W - PAD.r}" y2="${yy}" stroke="#eef1f6"/><text x="${PAD.l - 8}" y="${yy + 3}" font-size="10" fill="#6b7683" text-anchor="end">${label}</text>`).join("")}
+    <polygon points="${PAD.l},${y(0)} ${pts.join(" ")} ${x(days.length - 1)},${y(0)}" fill="url(#g)"/>
+    <polyline points="${pts.join(" ")}" fill="none" stroke="#2563eb" stroke-width="2"/>
+    ${days.map((d, i) => `<circle cx="${x(i)}" cy="${y(d.net_revenue)}" r="2.6" fill="#2563eb"><title>${d.date} 净营业额 ¥${fmtMoney(d.net_revenue)} · ${d.orders} 单</title></circle>`).join("")}
+    ${ticks.join("")}
+  </svg>`;
+}
+
+async function loadTop() {
+  const p = params();
+  const body = await (await fetch("/api/metrics/top?" + new URLSearchParams(p))).json();
+  const rows = body.products.map((r, i) => `
+    <tr><td>${i + 1}</td><td>${esc(r.product_id)}</td><td>${esc(r.product_name ?? "")}</td>
+    <td>${esc(r.product_category ?? "")}</td>
+    <td class="num">¥${fmtMoney(r.net_revenue)}</td><td class="num">${r.orders}</td><td class="num">${r.qty}</td></tr>`);
+  $("top-table").innerHTML = `<table>
+    <tr><th>#</th><th>编号</th><th>商品</th><th>品类</th><th class="num">净营业额</th><th class="num">订单</th><th class="num">销量</th></tr>
+    ${rows.join("") || "<tr><td colspan=7>没有数据</td></tr>"}</table>`;
+}
+
+async function loadDQ() {
+  const dq = await (await fetch("/api/data_quality")).json();
+  const cr = dq.cleaning_report || {};
+  const removed = cr.removed || {};
+  $("dq-list").innerHTML = Object.entries(removed)
+    .map(([k, v]) => `<li>${k.replace(/_/g, " ")}：<b>${v}</b> 行</li>`).join("")
+    + `<li>保留明细：<b style="color:var(--good)">${cr.kept_rows ?? "—"}</b> 行（销售 ${cr.kept_sales_rows ?? "—"} + 退款 ${cr.kept_refund_rows ?? "—"}）</li>`;
+  const h = await (await fetch("/api/health")).json();
+  $("llm-mode").textContent = h.llm_mode === "live" ? "在线模型" : "本地降级模式";
+  $("dq-kv").textContent = `知识库 ${h.kb_docs} 篇 / ${h.kb_chunks} 个片段 · 有效销售行 ${h.valid_sales_rows}`;
+}
+
+function addMsg(cls, html) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.innerHTML = html;
+  $("chat-log").appendChild(div);
+  $("chat-log").scrollTop = $("chat-log").scrollHeight;
+  return div;
+}
+
+const TYPE_CN = { data: "查数据", doc: "查文档", hybrid: "数据+文档", refusal: "拒答", clarify: "需要补充" };
+
+async function ask(question) {
+  addMsg("user", esc(question));
+  const holder = addMsg("bot", "思考中…");
+  try {
+    const body = await (await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: session, question }),
+    })).json();
+    let html = esc(body.answer) + `<div class="type">${TYPE_CN[body.answer_type] || body.answer_type}</div>`;
+    if (body.citations?.length) {
+      html += `<div class="cites">` + body.citations.map((c) =>
+        `<div><span class="doc">${esc(c.doc_id)}</span><blockquote>${esc(c.quote)}</blockquote></div>`).join("") + `</div>`;
+    }
+    if (body.data_evidence?.length) {
+      html += `<details><summary>数据证据</summary><pre>${esc(JSON.stringify(body.data_evidence, null, 1))}</pre></details>`;
+    }
+    holder.innerHTML = html;
+    if (body.trace_id) loadTrace(body.trace_id);
+  } catch (e) {
+    holder.textContent = "请求失败：" + e;
+  }
+}
+
+async function loadTrace(traceId) {
+  const res = await fetch("/api/trace/" + traceId);
+  if (!res.ok) { $("trace-steps").innerHTML = `<li>trace ${esc(traceId)} 不存在</li>`; return; }
+  const trace = await res.json();
+  const steps = trace.steps || [];
+  $("trace-steps").innerHTML =
+    `<li>trace <code>${esc(traceId)}</code> · 共 ${steps.length} 步</li>` +
+    steps.map((s) => `<li>${esc(s.step || s.name || "?")} <code>${(s.ms ?? s.elapsed_ms ?? 0)}ms</code></li>`).join("");
+}
+
+$("apply").onclick = () => { loadSummary(); loadTrend(); loadTop(); };
+$("chat-send").onclick = () => { const q = $("chat-q").value.trim(); if (q) { ask(q); $("chat-q").value = ""; } };
+$("chat-q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("chat-send").click(); });
+document.querySelectorAll(".chat-samples span").forEach((el) => { el.onclick = () => ask(el.textContent); });
+
+loadMeta().then(() => { loadSummary(); loadTrend(); loadTop(); loadDQ(); });
+</script>
+</body>
+</html>

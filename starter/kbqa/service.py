@@ -97,6 +97,18 @@ class Service:
     def metrics_daily(self, start: str, end: str, store_id=None, product_id=None) -> dict:
         return self.tools.daily_metrics(start, end, store_id, product_id)
 
+    def metrics_top(self, start: str, end: str, store_id=None, limit: int = 10) -> dict:
+        return self.tools.top_products(start, end, store_id, limit)
+
+    def meta(self) -> dict:
+        """看板首屏要用的静态元信息：筛选下拉、默认区间。"""
+        return {
+            "today": self.settings.today.isoformat(),
+            "data_period": self.data_period,
+            "stores": self.tools.stores(),
+            "products": self.tools.products(),
+        }
+
     def retrieve(self, query: str, top_k: int = 5) -> dict:
         """契约 §4：片段够就恰好给 top_k 条，不够才少给。
 
