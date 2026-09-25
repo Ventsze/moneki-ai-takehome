@@ -9,7 +9,7 @@ class TestCompare:
             "/api/metrics/compare", params={"start": "2026-06-01", "end": "2026-06-30"}
         ).json()
         assert body["current"]["net_revenue"] == 156757.0
-        assert body["previous"]["net_revenue"] == 111795.0
+        assert body["previous"]["net_revenue"] == 162338.0  # 5/2–5/31，独立 SQL 验证
         # 环比涨跌幅方向正确：6 月比 5 月（前 30 天 5/2–5/31）涨
         assert body["delta"]["net_revenue"]["direction"] in ("涨", "跌", "持平")
         assert body["current_window"] == ["2026-06-01", "2026-06-30"]
