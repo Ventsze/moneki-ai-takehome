@@ -150,18 +150,36 @@ class UnitIndex:
         # 边界的行劈成两半（“目标销量|900 杯”），逐块切行就再也拼不回来。
         fmt = index.docs_meta.get(doc_id, {}).get("format", "md")
         full_text = index.texts.get(doc_id, "")
-        for line_id, line in enumerate(_lines_of(full_text, fmt)):
+        lines = _lines_of(full_text, fmt)
+        # Markdown 表格：分隔行的上一行是表头，分隔行之后连续的 | 行共享它。
+        # 数据行标成 table 并带上表头，渲染时才写得出“麸质、大豆”这类字段名。
+        table_headers: dict[int, list[str]] = {}
+        for line_no, line in enumerate(lines):
+            # 键是分隔行自己的行号；处理到分隔行时取它当 active_header。
+            if re.fullmatch(r"\|[\s:|-]+\|", line.strip()) and line_no:
+                table_headers[line_no] = [
+                    cell.strip() for cell in lines[line_no - 1].strip().strip("|").split("|")
+                ]
+        active_header: list[str] = []
+        for line_id, line in enumerate(lines):
+            if re.fullmatch(r"\|[\s:|-]+\|", line.strip()):
+                active_header = table_headers.get(line_id, [])
+                continue
+            is_table_row = line.strip().startswith("|")
+            if not is_table_row:
+                active_header = []
             for sentence in split_sentences(line):
                 text = sentence.strip().lstrip("#").strip()
                 if not text or text in seen:
                     continue
                 seen.add(text)
-                kind = (
-                    "heading"
-                    if sentence.strip().startswith("#") or text in headings
-                    else "text"
-                )
-                unit = Unit(text, context, kind, [], doc_id, line_id=line_id)
+                if is_table_row:
+                    kind, header = "table", active_header
+                elif sentence.strip().startswith("#") or text in headings:
+                    kind, header = "heading", []
+                else:
+                    kind, header = "text", []
+                unit = Unit(text, context, kind, header, doc_id, line_id=line_id)
                 unit.start, unit.end = self.locate(doc_id, text, cursor)
                 cursor = max(cursor, unit.end)
                 units.append(unit)
