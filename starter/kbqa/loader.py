@@ -12,6 +12,9 @@ from typing import Optional
 #: 契约 §0：doc_id 与文件格式无关。知识库里有 .md、.txt、.html 三种格式。
 SUPPORTED_SUFFIXES = {".md", ".markdown", ".txt", ".html", ".htm"}
 
+#: loader 的解析逻辑变了，索引缓存必须失效（meta 键名、编码、去标签都算）。
+LOADER_VERSION = "loader-2"
+
 #: 文件名开头的编号就是 doc_id，与文件格式无关（契约 §0）。
 _DOC_ID = re.compile(r"^(KB-\d+)")
 _FRONT_MATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.S)
@@ -64,7 +67,7 @@ class Document:
             "doc_id": self.doc_id,
             "title": self.title,
             "type": self.doc_type,
-            "state": self.status,
+            "status": self.status,
             "effective_from": self.effective_from.isoformat() if self.effective_from else None,
             "superseded_by": self.superseded_by,
             "stores": self.stores,

@@ -237,7 +237,13 @@ class Retriever:
             if reason:
                 excluded.add(doc_id)
                 filtered.append({"doc_id": doc_id, "reason": reason})
-        allowed = set(range(len(self.index.chunks)))
+        # 被元数据过滤淘汰的文档，其片段根本不该进候选池：
+        # 契约 §4 禁止“先取 top_k 再过滤”，缺的格子在池内补齐。
+        allowed = set(
+            position
+            for position, chunk in enumerate(self.index.chunks)
+            if chunk.doc_id not in excluded
+        )
 
         scores = self.index.score_terms(self._weights(query), allowed)
         concepts, expansions = self._concept_scores(query, allowed)
@@ -247,10 +253,13 @@ class Retriever:
         for position, score in scores.items():
             doc_id = self.index.chunks[position].doc_id
             best_of_doc[doc_id] = max(best_of_doc.get(doc_id, 0.0), score)
+        # 元数据过滤淘汰一部分文档后，词命中的块可能不足 top_k。
+        # 契约 §4 要求恰好 top_k 条：过滤后留在场上的所有块都参与排序，
+        # 零相关的垫底，不够的部分由它们补齐。
         adjusted: list[tuple[float, int]] = []
-        for position, score in scores.items():
+        for position in sorted(allowed):
             doc_id = self.index.chunks[position].doc_id
-            total = score + DOC_PRIOR * best_of_doc.get(doc_id, 0.0)
+            total = scores.get(position, 0.0) + DOC_PRIOR * best_of_doc.get(doc_id, 0.0)
             adjusted.append(
                 (
                     total
@@ -303,9 +312,6 @@ class Retriever:
             # 契约 §4 还要求“按相关性从高到低”：补齐之后整体再排一次。
             # 每篇文档只占一格是挑片段的规则，不是排序的规则。
             hits.sort(key=lambda hit: -hit.score)
-        # 取够 top-k 之后，再把过滤掉的那些版本去掉。
-        hits = [hit for hit in hits if hit.doc_id not in excluded]
-
         return SearchResult(
             hits=hits,
             query=query,

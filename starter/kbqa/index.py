@@ -12,7 +12,7 @@ from typing import Optional
 
 from .aliases import AliasTable, build_alias_table
 from .chunker import CHUNKER_VERSION, Chunk, chunk_documents
-from .loader import Document, load_knowledge_base
+from .loader import LOADER_VERSION, Document, load_knowledge_base
 from .tokenizer import TOKENIZER_VERSION, tokenize
 
 INDEX_VERSION = "bm25-3"
@@ -27,7 +27,9 @@ def content_key(kb_dir: Path) -> str:
     评测流程会换一整套知识库再执行重建命令，索引必须跟着变。
     """
     digest = hashlib.sha256()
-    digest.update(("%s|%s|%s\n" % (INDEX_VERSION, CHUNKER_VERSION, TOKENIZER_VERSION)).encode())
+    digest.update(
+        ("%s|%s|%s|%s\n" % (INDEX_VERSION, CHUNKER_VERSION, TOKENIZER_VERSION, LOADER_VERSION)).encode()
+    )
     if kb_dir.exists():
         for path in sorted(kb_dir.rglob("*")):
             if not path.is_file() or path.name.startswith("."):
