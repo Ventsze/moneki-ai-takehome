@@ -75,5 +75,5 @@ python3 eval/run_eval.py --base-url http://localhost:8000 \
   --questions eval/my_questions.jsonl --out report_my
 ```
 
-当前结果：单元测试 `109 passed`；公开题库 `100/100`；自命题题库 `18/18`；
+当前结果：单元测试 `116 passed`；公开题库 `100/100`；自命题题库 `18/18`；
 OpenAI 兼容接入预检 `14/14`。
