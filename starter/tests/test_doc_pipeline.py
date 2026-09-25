@@ -132,3 +132,62 @@ class TestDocBlockOrdering:
         body = Service().chat("v02", "储值充值现在的赠送规则是什么？")
         assert "60" in body["answer"]
         assert any(c["doc_id"] == "KB-011" for c in body["citations"])
+
+
+class TestCrossChunkLine:
+    def test_line_split_across_chunks_is_reunited(self):
+        """300 字切块会把跨块边界的行劈成两半；units 必须把它拼回去。"""
+        from pathlib import Path
+
+        from kbqa.loader import Document
+
+        line = "首月全门店合计目标销量 900 杯，由各店分解执行。"
+        # 行起点 297：切块边界（300）落在“首月”与“全门店”之间，行被劈开
+        head = "甲" * 297
+        doc = Document(
+            doc_id="KB-300",
+            title="切块测试",
+            text=head + "\n" + line,
+            path=Path("KB-300.md"),
+            fmt="md",
+        )
+        from kbqa.index import BM25Index
+        from kbqa.chunker import chunk_documents
+        from kbqa.aliases import AliasTable
+
+        index = BM25Index(chunk_documents([doc]), {}, AliasTable(), "test")
+        store_units = None
+        from kbqa.units import UnitIndex
+
+        store = UnitIndex(index)
+        texts = [unit.text for unit in store.units("KB-300")]
+        assert any("目标销量 900 杯" in t for t in texts), texts
+
+
+class TestRealQuestions:
+    """公开题库中最难的几题，用真实知识库与检索跑全链路。"""
+
+    def test_h03_first_month_target(self):
+        from kbqa.service import Service
+
+        body = Service().chat("h03", "冷萃乌龙茶上市第一个月的销量达标了吗？")
+        assert body["answer_type"] == "hybrid"
+        assert "900" in body["answer"]
+        assert any(c["doc_id"] == "KB-028" for c in body["citations"])
+
+    def test_c07_reason_has_margin_figure(self):
+        from kbqa.service import Service
+
+        body = Service().chat("c07", "S04 为什么不卖吞拿鱼三明治了？")
+        assert any(c["doc_id"] == "KB-029" for c in body["citations"])
+        assert "35" in body["answer"] or any(
+            "35" in c["quote"] for c in body["citations"]
+        )
+
+    def test_c04_english_email_compensation(self):
+        from kbqa.service import Service
+
+        body = Service().chat("c04", "三文鱼那次断供，供应商最后赔了我们多少钱？")
+        assert any(c["doc_id"] == "KB-022" for c in body["citations"])
+        joined = body["answer"] + "".join(c["quote"] for c in body["citations"])
+        assert "8,600" in joined or "8600" in joined
