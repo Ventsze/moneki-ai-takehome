@@ -1,16 +1,30 @@
-"""把原始 sales 导进 var/clean.db，指标都查这张表。"""
+"""把原始 sales 导进 var/clean.db，指标都查这张表。
+
+清洗规则以 KB-001《指标口径手册 v3》为准：
+§2 规范化（编号大小写/空白、三种日期格式、¥ 前缀、qty 整数），
+§3 六类剔除按顺序执行，§4 退款行按负金额、日期归属退款行自己。
+"""
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import date as _date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable, Optional
 
 #: 金额里的 `¥` 去掉再按数字解析。
 _CURRENCY = str.maketrans("", "", "¥￥ \t　")
+
+#: KB-001 §2.2 的三种日期格式。DD-MM-YYYY 是旧 POS 导出，日在前、月在后。
+_DATE_PATTERNS = (
+    (re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$"), (1, 2, 3)),
+    (re.compile(r"^(\d{4})/(\d{1,2})/(\d{1,2})$"), (1, 2, 3)),
+    (re.compile(r"^(\d{1,2})-(\d{1,2})-(\d{4})$"), (3, 2, 1)),
+)
 
 REMOVAL_REASONS = (
     "1_unparseable_date",
@@ -20,6 +34,32 @@ REMOVAL_REASONS = (
     "5_product_not_in_products",
     "6_duplicate_row",
 )
+
+
+def normalize_date(value: Optional[str]) -> Optional[str]:
+    """把三种合法格式统一成 `YYYY-MM-DD`；解析不了返回 None。
+
+    `25-07-2026` 是 2026 年 7 月 25 日（日在前），`2026/5/1` 是 2026 年 5 月 1 日。
+    """
+    text = (value or "").strip()
+    for pattern, (y, m, d) in _DATE_PATTERNS:
+        match = pattern.match(text)
+        if not match:
+            continue
+        year, month, day = int(match.group(y)), int(match.group(m)), int(match.group(d))
+        if not 1 <= month <= 12 or not 1 <= day <= 31:
+            return None
+        try:
+            _date(year, month, day)
+        except ValueError:
+            return None
+        return "%04d-%02d-%02d" % (year, month, day)
+    return None
+
+
+def normalize_id(value: Optional[str]) -> str:
+    """KB-001 §2.1：编号去首尾空白并转大写。"""
+    return (value or "").strip().upper()
 
 
 def parse_amount(value: Optional[str]) -> tuple[Optional[int], str]:
@@ -74,28 +114,68 @@ def open_readonly(path: Path) -> sqlite3.Connection:
     return conn
 
 
-def clean_rows(rows: Iterable[sqlite3.Row]) -> tuple[list[tuple], CleaningReport]:
-    """把 sales 原样搬过来。金额解析不了的按 0，日期照抄，查询的时候直接比字符串。"""
+def clean_rows(
+    rows: Iterable,
+    store_ids: Optional[set[str]] = None,
+    product_ids: Optional[set[str]] = None,
+) -> tuple[list[tuple], CleaningReport]:
+    """按 KB-001 §2/§3 清洗：先规范化，再按顺序剔除六类行，最后去重。
+
+    `store_ids`、`product_ids` 是规范化后的合法编号集合（来自维表），
+    判断脏外键之前必须先做 §2.1 的规范化，顺序反了会误删真实订单（§7.2）。
+    """
+    store_ids = store_ids or set()
+    product_ids = product_ids or set()
     report = CleaningReport()
     kept: list[tuple] = []
+    seen: set[tuple] = set()
     for row in rows:
         report.raw_rows += 1
+        # §3.1 日期无法解析的行
+        day = normalize_date(row["date"])
+        if day is None:
+            report.removed["1_unparseable_date"] += 1
+            continue
+        # §3.2 amount 为空的行，不回填
         cents, status = parse_amount(row["amount"])
-        if status != "ok":
-            cents = 0
+        if status == "empty":
+            report.removed["2_empty_amount"] += 1
+            continue
+        if status == "bad":
+            # 手册只规定了空金额；解析不了的金额同样无法参与统计，剔除并单记一笔
+            report.note_unparseable_amount += 1
+            continue
+        # §3.3 qty ≤ 0 的行（解析不了的按 0 处理）
         qty = parse_qty(row["qty"]) or 0
-        kept.append(
-            (
-                (row["order_id"] or "").strip(),
-                row["date"],
-                row["store_id"],
-                row["product_id"],
-                qty,
-                cents,
-                (row["payment"] or "").strip(),
-                1 if cents < 0 else 0,
-            )
+        if qty <= 0:
+            report.removed["3_qty_le_zero"] += 1
+            continue
+        # §2.1 编号规范化后再判脏外键（§3.4/§3.5）
+        store_id = normalize_id(row["store_id"])
+        if store_id not in store_ids:
+            report.removed["4_store_not_in_stores"] += 1
+            continue
+        product_id = normalize_id(row["product_id"])
+        if product_id not in product_ids:
+            report.removed["5_product_not_in_products"] += 1
+            continue
+        record = (
+            (row["order_id"] or "").strip(),
+            day,
+            store_id,
+            product_id,
+            qty,
+            cents,
+            (row["payment"] or "").strip(),
+            1 if cents < 0 else 0,
         )
+        # §3.6 规范化后七字段完全相同的重复行只留一条；
+        # 共用订单号但商品不同的多行订单在这里天然不会被当成重复。
+        if record in seen:
+            report.removed["6_duplicate_row"] += 1
+            continue
+        seen.add(record)
+        kept.append(record)
     report.kept_rows = len(kept)
     report.kept_refund_rows = sum(1 for row in kept if row[-1])
     report.kept_sales_rows = report.kept_rows - report.kept_refund_rows
@@ -131,7 +211,9 @@ def build_clean_db(source: Path, target: Path) -> CleaningReport:
             )
         ]
         rows, report = clean_rows(
-            src.execute("SELECT order_id, date, store_id, product_id, qty, amount, payment FROM sales")
+            src.execute("SELECT order_id, date, store_id, product_id, qty, amount, payment FROM sales"),
+            store_ids={r[0] for r in src.execute("SELECT store_id FROM stores")},
+            product_ids={r[0] for r in src.execute("SELECT product_id FROM products")},
         )
     finally:
         src.close()

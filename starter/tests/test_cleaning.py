@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -76,8 +77,8 @@ class TestCleanRows:
             "5_product_not_in_products": 1,
             "6_duplicate_row": 1,
         }
-        assert report.kept_rows == 1
-        assert [r[0] for r in kept] == ["R7"]
+        assert report.kept_rows == 2  # R6 首条保留 + R7
+        assert [r[0] for r in kept] == ["R6", "R7"]
 
     def test_kb001_recoverable_values_kept(self):
         """§7：¥ 金额、大小写/空格编号、负金额都是可恢复脏值，不许扔。"""
@@ -118,9 +119,12 @@ class TestRealData:
     """对真实作业数据的锚点测试：数字与公开评测题 M01 的期望一致。"""
 
     def test_june_metrics_anchor(self, tmp_path):
-        root = __file__.resolve().parents[2]
+        root = Path(__file__).resolve().parents[2]
         report = build_clean_db(root / "data" / "pos.db", tmp_path / "clean.db")
-        assert report.kept_rows == 18293
+        # 剔除台账：坏日期 8（3×'2026-13-45'、3×'N/A'、2×空）、空金额 150、
+        # qty≤0 30、脏门店 10、脏商品 40、完全重复 100
+        assert report.removed["1_unparseable_date"] == 8
+        assert report.kept_rows == 18290
         conn = sqlite3.connect(tmp_path / "clean.db")
         try:
             net_cents, refunds, orders, qty = conn.execute(
