@@ -2,7 +2,7 @@
 
 一个给连锁餐饮运营用的系统：数据看板（指标/趋势/榜单/数据质量）+ 一个能同时查
 数据库与公司文档的 AI 助手。在 starter（前同事留下的 RAG 服务）基础上定位并修复了
-19 处缺陷，补齐混合问答链路、前端看板与安全约束。
+20 处缺陷，补齐混合问答链路、前端看板、安全约束与运营预警。
 
 **公开题库 97.0 / 100**（无 Key 降级模式，53/55 题全绿），轨迹见 `EVAL_REPORT.md`；
 缺陷逐条台账见 `DEBUG_LOG.md`；大模型接入见 `LLM_SETUP.md`（预检 14/14）。
@@ -35,14 +35,14 @@ python3 eval/run_eval.py --base-url http://localhost:8000 --questions eval/publi
 ```
                          ┌────────────────────────────────────────────┐
                          │              static/index.html             │
-                         │  筛选 · 指标卡 · SVG 趋势 · Top10 · 数据质量 │
+                         │  筛选 · 预警横幅 · 指标卡 · 环比 · SVG 趋势 · Top10 │
                          │  AI 对话框（引用/数据证据/trace 时间线）     │
                          └────────────────────┬───────────────────────┘
                                               │ HTTP
 ┌─────────────────────────────────────────────┴───────────────────────────────┐
 │ FastAPI  server.py（参数校验/序列化）                                        │
-│   /api/health /api/metrics/summary|daily|top /api/retrieve /api/chat        │
-│   /api/trace/{id} /api/data_quality /api/meta                               │
+│   /api/health /api/metrics/summary|daily|top|compare /api/retrieve /api/chat│
+│   /api/trace/{id} /api/data_quality /api/meta /api/anomalies                │
 │                                     service.py（编排、安全闸门、会话）        │
 │   ┌──────────────┐  ┌──────────────────────────────┐  ┌──────────────────┐  │
 │   │ planner.py   │  │ answerer.py / hybrid.py      │  │ live.py          │  │
