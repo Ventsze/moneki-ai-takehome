@@ -116,19 +116,19 @@ class TestDocAnswerShape:
 
 
 class TestDocBlockOrdering:
-    def test_doc_block_prefers_best_candidate(self, client):
-        """引用句必须按候选得分降序选（V01：活动价 ¥29 才是答案）。"""
-        body = client.post(
-            "/api/chat",
-            json={"session_id": "v01", "question": "今年 618 做活动的是哪个商品，活动价多少？"},
-        ).json()
+    """候选句排序对真实知识库生效；conftest 的 client 把检索 mock 掉了，
+    所以这两条直接用真实 Service 跑。"""
+
+    def test_doc_block_prefers_best_candidate(self):
+        from kbqa.service import Service
+
+        body = Service().chat("v01", "今年 618 做活动的是哪个商品，活动价多少？")
         assert "29" in body["answer"]
         assert any(c["doc_id"] == "KB-023" for c in body["citations"])
 
-    def test_current_version_preferred(self, client):
-        """问现行赠送规则，引用要含“赠送 60 元”这句（V02）。"""
-        body = client.post(
-            "/api/chat",
-            json={"session_id": "v02", "question": "储值充值现在的赠送规则是什么？"},
-        ).json()
+    def test_current_version_preferred(self):
+        from kbqa.service import Service
+
+        body = Service().chat("v02", "储值充值现在的赠送规则是什么？")
         assert "60" in body["answer"]
+        assert any(c["doc_id"] == "KB-011" for c in body["citations"])

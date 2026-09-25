@@ -74,7 +74,20 @@ class Answerer(HybridAnswers):
         candidates = self._candidates(plan, result, require_value=True)
         if not candidates:
             candidates = self._candidates(plan, result, require_value=False)
-        candidates.sort(key=lambda item: (round(item["score"], 2), item["effective_from"]))
+
+        def _order(item: dict) -> tuple:
+            """得分降序为主；分数打平时生效日期新的在前。"""
+            score_desc = -round(item["score"], 2)
+            day = item["effective_from"]
+            if day:
+                try:
+                    year, month, d = (int(part) for part in day.split("-"))
+                    return score_desc, -year, -month, -d
+                except ValueError:
+                    pass
+            return score_desc, 0, 0, 0
+
+        candidates.sort(key=_order)
         lines: list[str] = []
         citations: list[dict] = []
         used_terms: set[str] = set()
