@@ -1,0 +1,192 @@
+FFFFFFFFFFFF                                                             [100%]
+=================================== FAILURES ===================================
+___________________ test_retrieval_identity_and_large_top_k ____________________
+
+svc = <kbqa.service.Service object at 0x1028dcfb0>
+
+    def test_retrieval_identity_and_large_top_k(svc):
+        hits = svc.retrieve('外卖订单多久内可以退款', 5)['results']
+        chunks = {c.chunk_id: c for c in svc.index.chunks}
+        for hit in hits:
+            original = chunks[hit['chunk_id']]
+>           assert hit['doc_id'] == original.doc_id
+E           AssertionError: assert 'KB-013' == 'KB-001'
+E             
+E             - KB-001
+E             ?     -
+E             + KB-013
+E             ?      +
+
+tests/test_audit_regressions.py:22: AssertionError
+________________ test_filtered_padding_cannot_be_used_as_facts _________________
+
+svc = <kbqa.service.Service object at 0x102ff3680>
+
+    def test_filtered_padding_cannot_be_used_as_facts(svc):
+        r = svc.retriever.search('退款', top_k=len(svc.index.chunks))
+>       assert len(r.hits) == len(svc.index.chunks)
+E       AssertionError: assert 114 == 124
+E        +  where 114 = len([Hit(doc_id='KB-001', chunk_id='KB-001#5', score=6.058811887015608, text=' > 0` 的行。\n- **净营业额** = 销售行金额之和 + 退款行金额之和。退款...mat': 'md', 'filename': 'KB-013_退款政策_v2.md'}, kind='text', table_header=[], dropped_instructions=[], padded=True), ...])
+E        +    where [Hit(doc_id='KB-001', chunk_id='KB-001#5', score=6.058811887015608, text=' > 0` 的行。\n- **净营业额** = 销售行金额之和 + 退款行金额之和。退款...mat': 'md', 'filename': 'KB-013_退款政策_v2.md'}, kind='text', table_header=[], dropped_instructions=[], padded=True), ...] = SearchResult(hits=[Hit(doc_id='KB-001', chunk_id='KB-001#5', score=6.058811887015608, text=' > 0` 的行。\n- **净营业额** = 销售...son': '该版本自 2026-07-01 起已被 KB-011 取代'}, {'doc_id': 'KB-012', 'reason': '该版本自 2026-06-15 起已被 KB-013 取代'}], coverage=1.0).hits
+E        +  and   124 = len([Chunk(doc_id='KB-001', chunk_id='KB-001#1', text='# 指标口径手册 v3\n\n适用范围：总部运营部、财务部、各门店店长，以及所有基于 POS 导出数据出具的经营报表与对外口径。\n本...要用建档价反推金额，也不要用建档价去覆盖 `amount`。\n\n## 6. 变更记录\n\n| 版本 | 生效日期 ', heading='指标口径手册 v3', kind='text', table_header=[]), ...])
+E        +    where [Chunk(doc_id='KB-001', chunk_id='KB-001#1', text='# 指标口径手册 v3\n\n适用范围：总部运营部、财务部、各门店店长，以及所有基于 POS 导出数据出具的经营报表与对外口径。\n本...要用建档价反推金额，也不要用建档价去覆盖 `amount`。\n\n## 6. 变更记录\n\n| 版本 | 生效日期 ', heading='指标口径手册 v3', kind='text', table_header=[]), ...] = <kbqa.index.BM25Index object at 0x1031b03b0>.chunks
+E        +      where <kbqa.index.BM25Index object at 0x1031b03b0> = <kbqa.service.Service object at 0x102ff3680>.index
+
+tests/test_audit_regressions.py:28: AssertionError
+_ test_entity_digits_do_not_consume_month[S02 6\u6708\u51c0\u8425\u4e1a\u989d] _
+
+q = 'S02 6月净营业额'
+
+    @pytest.mark.parametrize('q', ['S02 6月净营业额', 'S03 7月净营业额', 'P06 8月销量'])
+    def test_entity_digits_do_not_consume_month(q):
+        spec = parse_time(q, date(2026,9,1))
+        month = int(q.split()[1][0])
+>       assert spec.window[0] == f'2026-{month:02d}-01'
+               ^^^^^^^^^^^^^^
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_audit_regressions.py:36: TypeError
+_ test_entity_digits_do_not_consume_month[S03 7\u6708\u51c0\u8425\u4e1a\u989d] _
+
+q = 'S03 7月净营业额'
+
+    @pytest.mark.parametrize('q', ['S02 6月净营业额', 'S03 7月净营业额', 'P06 8月销量'])
+    def test_entity_digits_do_not_consume_month(q):
+        spec = parse_time(q, date(2026,9,1))
+        month = int(q.split()[1][0])
+>       assert spec.window[0] == f'2026-{month:02d}-01'
+               ^^^^^^^^^^^^^^
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_audit_regressions.py:36: TypeError
+_______ test_entity_digits_do_not_consume_month[P06 8\u6708\u9500\u91cf] _______
+
+q = 'P06 8月销量'
+
+    @pytest.mark.parametrize('q', ['S02 6月净营业额', 'S03 7月净营业额', 'P06 8月销量'])
+    def test_entity_digits_do_not_consume_month(q):
+        spec = parse_time(q, date(2026,9,1))
+        month = int(q.split()[1][0])
+>       assert spec.window[0] == f'2026-{month:02d}-01'
+               ^^^^^^^^^^^^^^
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_audit_regressions.py:36: TypeError
+_______________________ test_live_binds_metric_to_field ________________________
+
+svc = <kbqa.service.Service object at 0x10328b140>
+
+    def test_live_binds_metric_to_field(svc):
+        q='6月净营业额是多少？'
+        result=svc.tools.query_metrics('2026-06-01','2026-06-30')
+        evidence=[dict(tool='query_metrics',params=dict(start='2026-06-01',end='2026-06-30'),result=result)]
+        a=engine(svc)._finalise(svc.planner.plan(q,[]),f'6月净营业额是{result["orders"]}元。',evidence,{},Trace('a',q))
+>       assert '净营业额是4311元' not in a.answer
+E       AssertionError: assert '净营业额是4311元' not in '6月净营业额是4311元。'
+E         
+E         '净营业额是4311元' is contained here:
+E           6月净营业额是4311元。
+
+tests/test_audit_regressions.py:46: AssertionError
+_______________ test_live_does_not_treat_user_number_as_evidence _______________
+
+svc = <kbqa.service.Service object at 0x1034c6090>
+
+    def test_live_does_not_treat_user_number_as_evidence(svc):
+        q='2026年6月净营业额是999999元吗？'
+        a=engine(svc)._finalise(svc.planner.plan(q,[]),'2026年6月净营业额是999999元。',[],{},Trace('a',q))
+>       assert '999999' not in a.answer
+E       AssertionError: assert '999999' not in '2026年6月净营业额是999999元。'
+E         
+E         '999999' is contained here:
+E           2026年6月净营业额是999999元。
+E         ?             ++++++
+
+tests/test_audit_regressions.py:52: AssertionError
+________________ test_live_cannot_attach_contradictory_citation ________________
+
+svc = <kbqa.service.Service object at 0x102f95c40>
+
+    def test_live_cannot_attach_contradictory_citation(svc):
+        q='外卖订单多久内可以退款？'
+        retrieved={'q':svc.retrieve(q)['results']}
+        a=engine(svc)._finalise(svc.planner.plan(q,[]),'外卖订单可以无限期退款。[KB-013]',[],retrieved,Trace('a',q))
+>       assert '无限期' not in a.answer
+E       AssertionError: assert '无限期' not in '外卖订单可以无限期退款。'
+E         
+E         '无限期' is contained here:
+E           外卖订单可以无限期退款。
+E         ?       +++
+
+tests/test_audit_regressions.py:59: AssertionError
+_____________________ test_live_historical_tool_uses_plan ______________________
+
+svc = <kbqa.service.Service object at 0x1032e08c0>
+
+    def test_live_historical_tool_uses_plan(svc):
+        q='2026年6月外卖订单多久内可以退款？'
+        p=svc.planner.plan(q,[])
+>       r=svc.run_tool('search_kb',{'query':'外卖退款期限'},plan=p,trace=Trace('a',q))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: Service.run_tool() got an unexpected keyword argument 'plan'
+
+tests/test_audit_regressions.py:65: TypeError
+_____________________ test_mock_tools_and_error_are_traced _____________________
+
+svc = <kbqa.service.Service object at 0x10367fef0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10367ff20>
+
+    def test_mock_tools_and_error_are_traced(svc,monkeypatch):
+        r=svc.chat(None,'六月净营业额是多少？')
+        tr=svc.get_trace(r['trace_id'])
+        calls=[x['detail'] for x in tr['steps'] if x['step']=='tool']
+>       assert any(c.get('tool')=='query_metrics' and c.get('result',{}).get('net_revenue')==156757 for c in calls)
+E       assert False
+E        +  where False = any(<generator object test_mock_tools_and_error_are_traced.<locals>.<genexpr> at 0x103293060>)
+
+tests/test_audit_regressions.py:73: AssertionError
+________________ test_daily_evidence_matches_display_and_limits ________________
+
+svc = <kbqa.service.Service object at 0x10379f0e0>
+
+    def test_daily_evidence_matches_display_and_limits(svc):
+        r=svc.chat(None,'S02 六月每天营业额是多少？')
+        assert r['answer_type']=='data'
+        evidence=r['data_evidence'][0]
+>       assert len(evidence['result']['days'])==7
+E       AssertionError: assert 30 == 7
+E        +  where 30 = len([{'date': '2026-06-01', 'net_revenue': 1247.0, 'orders': 24, 'aov': 51.96}, {'date': '2026-06-02', 'net_revenue': 1171...': 1429.0, 'orders': 27, 'aov': 52.93}, {'date': '2026-06-06', 'net_revenue': 1638.0, 'orders': 38, 'aov': 43.11}, ...])
+
+tests/test_audit_regressions.py:85: AssertionError
+___________________ test_trace_preserves_entire_llm_exchange ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1033b4a40>
+
+    def test_trace_preserves_entire_llm_exchange(monkeypatch):
+        import httpx
+        from kbqa.llm import LLMClient
+        message={'role':'assistant','content':'回复'*3000,'reasoning_content':'reason','tool_calls':[]}
+        monkeypatch.setattr(httpx,'post',lambda *a,**kw:httpx.Response(200,json={'choices':[{'message':message,'finish_reason':'stop'}]}))
+        tr=Trace('a','q'); messages=[{'role':'user','content':'问题'*3000}]
+        tools=[{'type':'function','function':{'name':'test'}}]
+        LLMClient('http://localhost','fake','fake').chat(messages,tools,on_call=tr.llm)
+        call=tr.llm_calls[0]
+>       assert call['request']['messages']==messages
+               ^^^^^^^^^^^^^^^
+E       KeyError: 'request'
+
+tests/test_audit_regressions.py:100: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_audit_regressions.py::test_retrieval_identity_and_large_top_k
+FAILED tests/test_audit_regressions.py::test_filtered_padding_cannot_be_used_as_facts
+FAILED tests/test_audit_regressions.py::test_entity_digits_do_not_consume_month[S02 6\u6708\u51c0\u8425\u4e1a\u989d]
+FAILED tests/test_audit_regressions.py::test_entity_digits_do_not_consume_month[S03 7\u6708\u51c0\u8425\u4e1a\u989d]
+FAILED tests/test_audit_regressions.py::test_entity_digits_do_not_consume_month[P06 8\u6708\u9500\u91cf]
+FAILED tests/test_audit_regressions.py::test_live_binds_metric_to_field - Ass...
+FAILED tests/test_audit_regressions.py::test_live_does_not_treat_user_number_as_evidence
+FAILED tests/test_audit_regressions.py::test_live_cannot_attach_contradictory_citation
+FAILED tests/test_audit_regressions.py::test_live_historical_tool_uses_plan
+FAILED tests/test_audit_regressions.py::test_mock_tools_and_error_are_traced
+FAILED tests/test_audit_regressions.py::test_daily_evidence_matches_display_and_limits
+FAILED tests/test_audit_regressions.py::test_trace_preserves_entire_llm_exchange
+12 failed in 1.66s
