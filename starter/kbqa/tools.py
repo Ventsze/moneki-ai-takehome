@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 from datetime import date, timedelta
@@ -72,11 +73,21 @@ class DataTools:
     def valid_sales_rows(self) -> int:
         return int(self.conn.execute("SELECT COUNT(*) FROM sales_clean").fetchone()[0])
 
+    #: 数据库绝对只读（第三关硬要求）：写语句与库文件操作直接拒绝，
+    #: 连接本身也是 mode=ro 的，这里是给模型一个可读的错误信息。
+    _FORBIDDEN_SQL = re.compile(
+        r"\b(insert|update|delete|drop|alter|create|replace|attach|detach|vacuum|reindex)\b",
+        re.I,
+    )
+
     def run_sql(self, sql: str) -> dict:
-        """执行一条 SQL。工具覆盖不到的查法，让模型自己写。"""
+        """执行一条只读 SQL。工具覆盖不到的查法，让模型自己写。"""
+        if self._FORBIDDEN_SQL.search(sql or ""):
+            return {"error": "数据库是只读的，只接受 SELECT 查询：%s" % sql}
+        if not (sql or "").strip().lower().lstrip("(").startswith("select"):
+            return {"error": "只接受 SELECT 查询：%s" % sql}
         cursor = self.conn.execute(sql)
         rows = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        self.conn.commit()
         return {"sql": sql, "rows": rows[:50], "row_count": len(rows)}
 
     def stores(self) -> list[dict]:

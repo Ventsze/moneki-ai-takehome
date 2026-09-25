@@ -108,8 +108,11 @@ class CleaningReport:
 
 
 def open_readonly(path: Path) -> sqlite3.Connection:
-    """打开数据库。"""
-    conn = sqlite3.connect(path.as_posix(), check_same_thread=False)
+    """以 SQLite URI 只读模式打开：连接层面保证不可能写入。"""
+    from urllib.parse import quote
+
+    uri = "file:%s?mode=ro" % quote(path.as_posix())
+    conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
