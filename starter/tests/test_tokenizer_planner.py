@@ -24,7 +24,7 @@ class TestTokenize:
         tokens = tokenize("KB-013 三文鱼poke")
         assert "poke" in tokens
         assert "三文" in tokens and "文鱼" in tokens
-        assert "013" in tokens
+        assert "kb-013" in tokens  # 编号整词，便于引用命中
 
     def test_query_and_document_share_tokens(self):
         """问句与文档原文必须有公共 token，这是 BM25 能命中的前提。"""

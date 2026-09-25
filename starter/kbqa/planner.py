@@ -248,15 +248,6 @@ class Planner:
         else:
             plan.kind, plan.intent = "summary", "data"
 
-        # 路由：问“多少/多久/几”的就是要数字，问“为什么/原因”的就是要说法。
-        # 两边都走一遍太慢，没必要。
-        if E.has_any(text, ("多少", "多久", "几")):
-            plan.intent = "data"
-            if plan.kind in ("doc", "anomaly", "target", "price"):
-                plan.kind = "summary"
-        elif E.has_any(text, ("为什么", "原因", "怎么回事", "咋回事")):
-            plan.intent, plan.kind = "doc", "doc"
-
         plan.slots["asks_why"] = bool(asks_why or abnormal)
         plan.slots["about_names"] = E.asks_about_names(text)
         plan.slots["two_part"] = False
