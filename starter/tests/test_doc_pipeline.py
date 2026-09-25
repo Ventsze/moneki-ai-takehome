@@ -155,13 +155,15 @@ class TestCrossChunkLine:
         from kbqa.chunker import chunk_documents
         from kbqa.aliases import AliasTable
 
-        index = BM25Index(chunk_documents([doc]), {}, AliasTable(), "test")
+        index = BM25Index(
+            chunk_documents([doc]), {}, AliasTable(), "test", texts={"KB-300": doc.text}
+        )
         store_units = None
         from kbqa.units import UnitIndex
 
         store = UnitIndex(index)
         texts = [unit.text for unit in store.units("KB-300")]
-        assert any("目标销量 900 杯" in t for t in texts), texts
+        assert any("首月全门店合计目标销量 900 杯" in t for t in texts), texts
 
 
 class TestRealQuestions:

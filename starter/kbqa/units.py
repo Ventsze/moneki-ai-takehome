@@ -117,11 +117,19 @@ class UnitIndex:
         headings: set[str] = set()
         for chunk in index.chunks_of(doc_id):
             headings.update(part.strip() for part in chunk.heading.split(" > ") if part.strip())
+        context = set()
+        has_table = False
         for chunk in index.chunks_of(doc_id):
-            context = set(tokenize(chunk.heading))
+            context.update(tokenize(chunk.heading))
             for canonical in index.aliases.strict_mentions(chunk.heading):
                 context.update(tokenize(canonical))
             if chunk.kind == "table":
+                has_table = True
+        if has_table:
+            # 表格行必须按 chunk 的表头逐块处理。
+            for chunk in index.chunks_of(doc_id):
+                if chunk.kind != "table":
+                    continue
                 header_tokens = set(tokenize(" ".join(chunk.table_header)))
                 header_cells = [cell.strip() for cell in chunk.table_header]
                 for line in chunk.source_text.splitlines():
@@ -138,23 +146,25 @@ class UnitIndex:
                     unit.start, unit.end = self.locate(doc_id, stripped, cursor)
                     cursor = max(cursor, unit.end)
                     units.append(unit)
-                continue
-            fmt = index.docs_meta.get(doc_id, {}).get("format", "md")
-            for line_id, line in enumerate(_lines_of(chunk.source_text, fmt)):
-                for sentence in split_sentences(line):
-                    text = sentence.strip().lstrip("#").strip()
-                    if not text or text in seen:
-                        continue
-                    seen.add(text)
-                    kind = (
-                        "heading"
-                        if sentence.strip().startswith("#") or text in headings
-                        else "text"
-                    )
-                    unit = Unit(text, context, kind, [], doc_id, line_id=id(chunk) * 1000 + line_id)
-                    unit.start, unit.end = self.locate(doc_id, text, cursor)
-                    cursor = max(cursor, unit.end)
-                    units.append(unit)
+        # 正文行在整篇文档上切，不在 chunk 上切：切块会把恰好跨 300 字
+        # 边界的行劈成两半（“目标销量|900 杯”），逐块切行就再也拼不回来。
+        fmt = index.docs_meta.get(doc_id, {}).get("format", "md")
+        full_text = index.texts.get(doc_id, "")
+        for line_id, line in enumerate(_lines_of(full_text, fmt)):
+            for sentence in split_sentences(line):
+                text = sentence.strip().lstrip("#").strip()
+                if not text or text in seen:
+                    continue
+                seen.add(text)
+                kind = (
+                    "heading"
+                    if sentence.strip().startswith("#") or text in headings
+                    else "text"
+                )
+                unit = Unit(text, context, kind, [], doc_id, line_id=line_id)
+                unit.start, unit.end = self.locate(doc_id, text, cursor)
+                cursor = max(cursor, unit.end)
+                units.append(unit)
         self._cache[doc_id] = units
         return units
 

@@ -148,7 +148,14 @@ class DocFacts:
                     # 标题带来的相关性是间接的，算一半。
                     hit += weight * 0.5
             if hit <= 0:
-                continue
+                # 主题相关性由外层 BM25 保证（这篇文章本来就是检索命中的）；
+                # 句内与问句零词重叠——典型是中文问句配英文邮件——但确实
+                # 满足问句焦点的句子给一个保底分参与排序，否则“CNY 8,600”
+                # 这样的关键数字句永远进不了候选。
+                if require_value and kinds and self.focus_of(unit, kinds):
+                    hit = 0.25 * total
+                else:
+                    continue
             # 同样的覆盖率，短句子是更好的答案；标题与问句本身都不是答案。
             score = hit / total * (80.0 / (80.0 + max(len(unit.text), 24))) ** 0.5
             if unit.kind == "heading":
