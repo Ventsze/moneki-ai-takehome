@@ -55,6 +55,7 @@ ABNORMAL_WORDS = (
 CANNOT_KNOW = (
     "天气", "下雨", "降雨", "晴天", "阴天", "预报", "预测", "会不会下",
     "股票", "股价", "汇率", "房租", "房价", "工资", "薪资", "年终奖", "提成", "竞品", "对手",
+    "进价", "成本价", "批发价", "原料价", "收购价",
 )
 #: 知识库确实讲这件事的门槛：词表覆盖率与检索最高分同时达到，才算“讲了”。
 #: 达标就一律照答——这是防止“可疑话题词”误伤可答问题的那道闸。
@@ -116,6 +117,9 @@ FOLLOW_UP = (
     re.compile(r"(呢|如何|怎么样)[？?]?$"),
     re.compile(r"^(它|他们|这家|那家|这个|那个|同期|同比)"),
 )
+#: 完整疑问结构的信号：带这些词的句子有自己的主语和问点，
+#: 不能因为以指示词开头就当成省略了上文的追问。
+_COMPLETE_QUESTION = re.compile(r"多少|几|怎么|为什么|多久|哪些")
 
 
 @dataclass
@@ -313,6 +317,8 @@ def out_of_scope(text: str, coverage: float, top_score: float) -> Optional[str]:
 
 def looks_like_follow_up(text: str) -> bool:
     stripped = text.strip()
+    if _COMPLETE_QUESTION.search(stripped):
+        return False
     if len(stripped) <= 12 and any(pattern.search(stripped) for pattern in FOLLOW_UP):
         return True
     return bool(FOLLOW_UP[0].search(stripped) and len(stripped) <= 20)

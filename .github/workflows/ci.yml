@@ -1,0 +1,56 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖并重建
+        working-directory: starter
+        run: |
+          python3.12 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          make rebuild
+          make test
+
+      - name: 启动服务（无 Key 降级模式）
+        working-directory: starter
+        run: |
+          .venv/bin/python -m uvicorn kbqa.server:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8000/api/health >/dev/null && break
+            sleep 1
+          done
+
+      - name: 公开题库回归（阈值 95）
+        run: |
+          python3 eval/run_eval.py --base-url http://127.0.0.1:8000 \
+            --questions eval/public_questions.jsonl
+          python3 - <<'PY'
+          import json
+          report = json.load(open("report.json"))
+          earned = sum(c["earned"] for c in report["per_category"].values())
+          points = sum(c["points"] for c in report["per_category"].values())
+          print(f"公开题库：{earned} / {points}")
+          assert earned >= 95, "公开题库分数跌破阈值，禁止合并"
+          PY
+
+      - name: 自命题题库回归（满分 18）
+        run: |
+          python3 eval/run_eval.py --base-url http://127.0.0.1:8000 \
+            --questions eval/my_questions.jsonl --out report_my
+          python3 - <<'PY'
+          import json
+          report = json.load(open("report_my/report.json"))
+          earned = sum(c["earned"] for c in report["per_category"].values())
+          points = sum(c["points"] for c in report["per_category"].values())
+          print(f"自命题题库：{earned} / {points}")
+          assert earned == points, "自命题回归锚点破线，禁止合并"
+          PY
