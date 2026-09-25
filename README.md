@@ -18,7 +18,7 @@ make rebuild        # 从 ../data 与 ../knowledge_base 重建清洗表和检索
 make run            # 服务起在 http://localhost:8000，看板直接浏览器打开
 ```
 
-跑测试：`make test`（88 个用例）；自命题回归题库 `eval/my_questions.jsonl`（10 题）与
+跑测试：`make test`（94 个用例）；自命题回归题库 `eval/my_questions.jsonl`（10 题）与
 公开题库均接进 CI（`.github/workflows/ci.yml`，push/PR 自动跑，破线禁止合并）。
 跑公开题库（另开终端，回到根目录）：
 

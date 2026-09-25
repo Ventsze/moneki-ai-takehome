@@ -127,8 +127,6 @@ class Service:
         per_store_day = {}
         for row in self.tools.day_store_revenue(period_start.isoformat(), period_end.isoformat()):
             per_store_day[(row["store_id"], row["date"])] = row["net_cents"]
-        all_days = sorted({day for _, day in per_store_day})
-
         anomalies: list[dict] = []
 
         # 营业中断：某店某日无明细，但该店前后 7 天内都在正常营业。

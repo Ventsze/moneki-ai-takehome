@@ -21,6 +21,7 @@
 | `LLM_BASE_URL` | 模型服务地址 | 空（→ mock 模式） | 环境变量，`kbqa/config.py load_settings()` |
 | `LLM_API_KEY` | 模型 Key | 空 | 环境变量 |
 | `LLM_MODEL` | 模型名 | 空 | 环境变量 |
+| `LLM_TIMEOUT` | 单次模型调用超时秒数 | 120 | 环境变量（可选，`kbqa/config.py`） |
 
 - 三个变量**全部非空**即进入 `live` 模式，任一为空即 `mock`；`/api/health` 的
   `llm_mode` 字段实时反映。

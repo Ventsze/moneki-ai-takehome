@@ -86,7 +86,12 @@ class DataTools:
             return {"error": "数据库是只读的，只接受 SELECT 查询：%s" % sql}
         if not (sql or "").strip().lower().lstrip("(").startswith("select"):
             return {"error": "只接受 SELECT 查询：%s" % sql}
-        cursor = self.conn.execute(sql)
+        try:
+            cursor = self.conn.execute(sql)
+        except sqlite3.Error as exc:
+            # 多语句、语法错误等：返回错误而不是抛出，调用方（live 引擎）
+            # 能把原因交给模型修正，/api/chat 始终 200。
+            return {"error": "SQL 执行失败：%s" % exc}
         rows = [dict(row) for row in cursor.fetchall()] if cursor.description else []
         return {"sql": sql, "rows": rows[:50], "row_count": len(rows)}
 

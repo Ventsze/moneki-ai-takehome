@@ -175,7 +175,7 @@
 
 ## 修复后的整链路验证
 
-- 单元与接口回归：`make test`，84 个用例。
+- 单元与接口回归：`make test`，94 个用例。
 - 公开题库：97 / 100（无 Key 降级模式），轨迹见 `EVAL_REPORT.md`。
 - 接入预检：`eval/llm_gateway.py preflight` 14/14 通过，报告全文见 `LLM_SETUP.md` 第 7 节。
 
