@@ -7,6 +7,13 @@
 **公开题库 100.0 / 100**（无 Key 降级模式，55/55 题全绿），轨迹见 `EVAL_REPORT.md`；
 缺陷逐条台账见 `DEBUG_LOG.md`；大模型接入见 `LLM_SETUP.md`（预检 14/14）。
 
+[![CI](https://github.com/Ventsze/moneki-ai-takehome/actions/workflows/ci.yml/badge.svg)](https://github.com/Ventsze/moneki-ai-takehome/actions/workflows/ci.yml)
+
+> **评审速览**：从运营预警直接追问 AI；经营数字可展开核对数据库证据，制度与原因可核对
+> 逐字原文引用，每次回答均可沿 trace 复盘规划、检索、工具调用和耗时。
+
+![混合问答：数据库证据、知识库引用与 trace](docs/demo-hybrid.png)
+
 ## 三步跑起来
 
 需要 Python 3.12。作业包根目录（本文件所在目录）：
@@ -77,9 +84,10 @@ python3 eval/run_eval.py --base-url http://localhost:8000 --questions eval/publi
   可解释、可调试（trace 能看到每个词的命中）；二元组是 docfacts 注释里写明的设计意图
   （starter 的空白切词是缺陷，见 DEBUG_LOG D7）。不引入向量库/嵌入模型：隐藏题库
   会换一整套知识库，任何依赖外部嵌入服务的设计都是可用性风险。
-- **回答的数字只由代码从工具结果渲染**：无论 mock 还是 live 模式，`answer` 里的经营
-  数字都来自 `data_evidence` 里的真实查询结果；模型只负责组织语言。这使"思考模式
-  temperature 不生效""偶尔空回复"等模型行为不可能污染数字。
+- **模型选工具，本地代码发布事实**：live 模式下模型负责选择工具与资料来源；最终对外
+  答案由本地 `Answerer` 根据已验证的数据库结果和逐字原文重新渲染，模型自由文本不会
+  直接作为经营事实发布。无论 mock 还是 live，经营数字都与 `data_evidence` 绑定，因此
+  "思考模式 temperature 不生效"、偶发空回复或模型换写数字都不能污染结果。
 - **前端单文件 HTML + 手写 SVG**：零构建、零 CDN 依赖，`make run` 即完整可用，
   评审环境不需要联网。
 - **安全双层防护**：SQLite URI `mode=ro` 物理只读（连接层）+ SQL 工具只放行 SELECT

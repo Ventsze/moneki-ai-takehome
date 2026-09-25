@@ -83,7 +83,12 @@
   .trace-steps pre { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f6f7f9; padding: 10px; }
   .trace-steps code { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
   .alert-banner { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
-  .alert-banner h2 { color: var(--warn); }
+  .alert-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .alert-banner h2 { color: var(--warn); margin: 0 auto 0 0; }
+  .alert-summary { display: flex; flex-wrap: wrap; gap: 6px; }
+  .alert-summary span { background: #ffedd5; color: var(--warn); border-radius: 12px; padding: 1px 9px; font-size: 11px; }
+  .alert-toggle { border: 1px solid #fdba74; background: #fff; color: var(--warn); border-radius: 7px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  .alert-list.collapsed .alert-item:nth-child(n+6) { display: none; }
   .alert-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px dashed #fed7aa; font-size: 13px; }
   .alert-item:first-of-type { border-top: 0; }
   .alert-tag { flex: none; font-size: 11px; border-radius: 12px; padding: 1px 9px; background: #ffedd5; color: var(--warn); }
@@ -117,8 +122,12 @@
   </div>
 
   <div class="alert-banner" id="alert-banner" style="display:none">
-    <h2>⚠ 运营预警</h2>
-    <div id="alert-list"></div>
+    <div class="alert-head">
+      <h2>⚠ 运营预警</h2>
+      <div class="alert-summary" id="alert-summary"></div>
+      <button class="alert-toggle" id="alert-toggle" type="button" aria-expanded="false"></button>
+    </div>
+    <div class="alert-list collapsed" id="alert-list"></div>
   </div>
 
   <div class="cards" id="summary-cards"></div>
@@ -272,6 +281,13 @@ async function loadAnomalies() {
   const items = body.anomalies || [];
   if (!items.length) { $("alert-banner").style.display = "none"; return; }
   $("alert-banner").style.display = "";
+  const counts = items.reduce((all, item) => {
+    all[item.kind] = (all[item.kind] || 0) + 1;
+    return all;
+  }, {});
+  $("alert-summary").innerHTML = Object.entries(KIND_CN)
+    .filter(([kind]) => counts[kind])
+    .map(([kind, label]) => `<span>${label} ${counts[kind]}</span>`).join("");
   $("alert-list").innerHTML = items.map((a) => `
     <div class="alert-item">
       <span class="alert-tag">${KIND_CN[a.kind] || a.kind}</span>
@@ -283,17 +299,37 @@ async function loadAnomalies() {
       )}</span>
       <button data-q="${esc(a.question)}">问 AI 为什么</button>
     </div>`).join("");
+  const toggle = $("alert-toggle");
+  toggle.style.display = items.length > 5 ? "" : "none";
+  toggle.textContent = `展开全部（${items.length}）`;
+  toggle.setAttribute("aria-expanded", "false");
+  $("alert-list").classList.add("collapsed");
+  toggle.onclick = () => {
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    $("alert-list").classList.toggle("collapsed", expanded);
+    toggle.textContent = expanded ? `展开全部（${items.length}）` : "收起";
+  };
   document.querySelectorAll(".alert-item button").forEach((btn) => {
     btn.onclick = () => ask(btn.dataset.q);
   });
 }
 
+const DQ_LABELS = {
+  "1_unparseable_date": "日期无法解析",
+  "2_empty_amount": "金额为空",
+  "3_qty_le_zero": "数量小于等于 0",
+  "4_store_not_in_stores": "门店编号不存在",
+  "5_product_not_in_products": "商品编号不存在",
+  "6_duplicate_row": "重复明细",
+  "note_unparseable_amount": "金额格式异常（按 0 处理）",
+};
 async function loadDQ() {
   const dq = await (await fetch("/api/data_quality")).json();
   const cr = dq.cleaning_report || {};
   const removed = cr.removed || {};
   $("dq-list").innerHTML = Object.entries(removed)
-    .map(([k, v]) => `<li>${k.replace(/_/g, " ")}：<b>${v}</b> 行</li>`).join("")
+    .map(([k, v]) => `<li>${DQ_LABELS[k] || k.replace(/_/g, " ")}：<b>${v}</b> 行</li>`).join("")
     + `<li>保留明细：<b style="color:var(--good)">${cr.kept_rows ?? "—"}</b> 行（销售 ${cr.kept_sales_rows ?? "—"} + 退款 ${cr.kept_refund_rows ?? "—"}）</li>`;
   const h = await (await fetch("/api/health")).json();
   $("llm-mode").textContent = h.llm_mode === "live" ? "在线模型" : "本地降级模式";
