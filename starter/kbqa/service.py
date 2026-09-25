@@ -37,6 +37,7 @@ _HARMFUL_PATTERNS = (
     re.compile(r"(系统提示词|system\s*prompt|初始指令|预设指令)", re.I),
     re.compile(r"(表结构|库表|schema|数据库.{0,6}(结构|定义))", re.I),
     re.compile(r"忽略.{0,8}(之前|以上|上面|先前|所有).{0,8}(规则|指令|提示|设定)"),
+    re.compile(r"ignore\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions|prompts|rules)", re.I),
     re.compile(r"(你是|假装你是|现在你是).{0,12}(管理员|root|开发者| unrestricted)", re.I),
 )
 

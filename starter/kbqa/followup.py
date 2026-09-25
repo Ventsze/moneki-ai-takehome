@@ -55,6 +55,13 @@ class FollowUps:
         if new_spec.windows or new_spec.whole_period:
             for label in old_spec.labels:
                 cleaned = cleaned.replace(label, "")
+            # labels 会把“六月”规范化成“6月”；两种写法不一致时仍要移除旧时间，
+            # 否则“那七月呢”会拼成“七月 + 六月…”，排序后错误沿用六月。
+            cleaned = re.sub(
+                r"(?:(?:20\d{2})\s*年)?\s*(?:\d{1,2}|[一二三四五六七八九十]{1,3})\s*月(?:份)?",
+                "",
+                cleaned,
+            )
             for word in ("现在", "目前", "当前", "最近"):
                 cleaned = cleaned.replace(word, "")
         extra = re.sub(r"^(那么|那|接着|然后)", "", question.strip())

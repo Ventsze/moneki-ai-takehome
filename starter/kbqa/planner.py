@@ -238,7 +238,7 @@ class Planner:
             plan.kind, plan.intent = "payment", "data"
         elif asks_rank and E.has_any(text, E.CATEGORY_WORDS):
             plan.kind, plan.intent = "category", "data"
-        elif E.has_any(text, E.STORE_WORDS) and not plan.store_id:
+        elif E.has_any(text, E.STORE_BREAKDOWN_WORDS) and not plan.store_id:
             # “各门店 7 月营业额分别是多少”没有排名词，但要的就是分店明细。
             plan.kind, plan.intent = "by_store", "data"
         elif asks_rank:
@@ -310,5 +310,4 @@ class Planner:
             elif key == "hours" and E.has_any(plan.standalone, ("营业到", "几点", "营业时间", "开门", "关门")):
                 parts.extend(words)
         plan.search_query = " ".join(parts)
-
 

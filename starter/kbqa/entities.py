@@ -14,7 +14,7 @@ METRIC_WORDS: list[tuple[str, tuple[str, ...]]] = [
     ("refund_amount", ("退款金额", "退了多少钱", "退款额", "退款总额", "退款多少")),
     ("aov", ("客单价", "平均每单", "单均", "人均消费")),
     ("orders", ("订单数", "多少单", "单量", "订单量", "成交单数", "有效订单")),
-    ("qty", ("销量", "卖了多少份", "多少份", "多少杯", "多少碗", "多少件", "卖出", "售出", "销售数量")),
+    ("qty", ("销量", "卖了多少份", "卖几份", "多少份", "多少杯", "多少碗", "多少件", "卖出", "售出", "销售数量")),
     ("net_revenue", ("净营业额", "营业额", "销售额", "营收", "收入", "流水", "卖了多少钱", "业绩", "GMV")),
 ]
 
@@ -22,13 +22,14 @@ PAYMENT_WORDS = ("支付方式", "支付占比", "现金", "微信", "支付宝"
 RANK_WORDS = ("最高", "最多", "最好", "第一", "top", "排名", "最畅销", "卖得最好", "最低", "最少")
 CATEGORY_WORDS = ("品类", "类别", "分类", "什么类型的店", "哪类")
 STORE_WORDS = ("门店", "哪家店", "哪个店", "各店", "每家店", "分店")
+STORE_BREAKDOWN_WORDS = ("哪家店", "哪个店", "各店", "每家店", "分别", "逐店", "按门店")
 PRODUCT_RANK_WORDS = ("商品", "产品", "单品", "菜品")
 #: “为什么”的各种说法。与问句焦点用同一张表，免得两处不一致。
 WHY_WORDS = (
     "为什么", "为何", "原因", "什么原因", "怎么回事", "咋回事", "什么情况", "怎么会",
     "凭什么", "因为什么", "出了什么问题", "出什么问题", "怎么搞的",
 )
-TARGET_WORDS = ("达标", "达到目标", "目标", "完成率", "有没有完成", "完成了吗")
+TARGET_WORDS = ("达标", "达到目标", "目标", "完成率", "有没有完成", "完成了吗", "完成目标", "过线")
 PRICE_WORDS = ("卖多少钱", "价格", "售价", "多少钱一", "单价", "调价", "涨价", "现价")
 TREND_WORDS = ("涨", "跌", "变化", "趋势", "环比", "同比", "相比", "对比", "比起", "差了", "差多少", "相差", "高了还是", "低了还是", "多多少", "少多少")
 DAILY_WORDS = ("每天", "逐日", "按天", "日趋势", "每日")
@@ -161,6 +162,14 @@ class Catalog:
             if upper in self.store_ids():
                 return upper, None
             return None, upper
+        # 口语里的“二号店/2 号店”是门店编号，不应要求用户必须会写 S02。
+        spoken = re.search(r"([一二三四五六七八九十两]|\d{1,2})\s*号店", lowered)
+        if spoken:
+            digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+                      "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+            number = digits.get(spoken.group(1), int(spoken.group(1)) if spoken.group(1).isdigit() else 0)
+            code = "S%02d" % number
+            return (code, None) if code in self.store_ids() else (None, code)
         for store in self.stores:
             if normalise(store["store_name"]) in lowered:
                 return store["store_id"], None
@@ -176,7 +185,8 @@ class Catalog:
         return None, None
 
     def find_product(self, text: str) -> tuple[Optional[str], Optional[str]]:
-        lowered = normalise(text)
+        # “波奇”是 poke 的通用音译，先做语言归一，再走知识库生成的实体别名表。
+        lowered = normalise(text).replace("波奇", "poke")
         for code in re.findall(r"\bp\d{1,2}\b", lowered):
             upper = code.upper()
             if upper in {product["product_id"] for product in self.products}:
