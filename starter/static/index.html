@@ -165,7 +165,8 @@ async function loadMeta() {
   meta = await (await fetch("/api/meta")).json();
   const { start, end } = meta.data_period;
   $("f-start").value = start; $("f-end").value = end;
-  $("head-sub").textContent = "系统日期 " + meta.today + " · 数据区间 " + start + " ~ " + end;
+  $("head-sub").textContent =
+    "业务基准日 " + meta.today + "（按公司口径固定，当前真实时间与此无关） · 数据区间 " + start + " ~ " + end;
   for (const s of meta.stores) {
     $("f-store").insertAdjacentHTML("beforeend", `<option value="${esc(s.store_id)}">${esc(s.store_id)} ${esc(s.store_name)}</option>`);
   }
@@ -234,16 +235,28 @@ async function loadTop() {
 async function loadCompare() {
   const p = params();
   const body = await (await fetch("/api/metrics/compare?" + new URLSearchParams(p))).json();
+  // 上一等长区间没有数据时（如所选区间覆盖了数据起点），pct 为 null：
+  // 显示"—"并注明，而不是渲染 null% 或误导性的巨大差额。
+  const prevHasData = body.period_a.net_revenue > 0 || body.period_a.orders > 0;
+  const sub = prevHasData ? "vs 上一等长区间" : "上一等长区间无数据";
   const cell = (label, cur, prev, fmt) => {
+    if (!prevHasData) {
+      return `<div class="cmp"><div class="k">${label} 环比</div><div class="v">${fmt(cur)}</div>
+        <div style="font-size:12px;color:var(--muted)">${sub}</div></div>`;
+    }
     const d = cur - prev;
     const cls = d > 0 ? "up" : d < 0 ? "down" : "";
     const sign = d > 0 ? "+" : "";
     return `<div class="cmp"><div class="k">${label} 环比</div><div class="v">${fmt(cur)}</div>
-      <div class="${cls}" style="font-size:12px">${sign}${fmt(d).replace("¥", "")} vs 上一等长区间</div></div>`;
+      <div class="${cls}" style="font-size:12px">${sign}${fmt(d).replace("¥", "")} ${sub}</div></div>`;
   };
   const pctCell = (label, pct) => {
+    if (pct == null) {
+      return `<div class="cmp"><div class="k">${label} 环比</div><div class="v">—</div>
+        <div style="font-size:12px;color:var(--muted)">${sub}</div></div>`;
+    }
     const cls = pct > 0 ? "up" : pct < 0 ? "down" : "";
-    return `<div class="cmp"><div class="k">${label} 环比</div><div class="v ${cls}">${pct > 0 ? "+" : ""}${pct}%</div><div style="font-size:12px;color:var(--muted)">vs 上一等长区间</div></div>`;
+    return `<div class="cmp"><div class="k">${label} 环比</div><div class="v ${cls}">${pct > 0 ? "+" : ""}${pct}%</div><div style="font-size:12px;color:var(--muted)">${sub}</div></div>`;
   };
   $("compare-strip").innerHTML =
     cell("净营业额", body.period_b.net_revenue, body.period_a.net_revenue, (v) => "¥" + fmtMoney(v)) +
