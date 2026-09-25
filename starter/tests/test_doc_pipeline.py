@@ -217,3 +217,13 @@ class TestVersionStatus:
         body = Service().chat("c01", "外卖订单多久内可以申请退款？")
         assert any(c["doc_id"] == "KB-013" for c in body["citations"])
         assert "24" in body["answer"]
+
+
+class TestRetrieveTopK:
+    def test_retrieve_returns_exact_top_k(self, real_client):
+        """契约 §4：恰好 top_k 条；过滤导致命中块不足时由其余块补满。"""
+        # “外卖订单多久内可以申请退款”在现行版过滤后只剩少量命中块
+        body = real_client.post(
+            "/api/retrieve", json={"query": "外卖订单多久内可以申请退款", "top_k": 5}
+        ).json()
+        assert len(body["results"]) == 5
