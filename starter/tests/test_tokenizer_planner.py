@@ -67,3 +67,20 @@ class TestPlannerIntent:
     def test_allergen_question_is_doc_not_refused_by_planner(self, planner):
         plan = planner.plan("有顾客问牛肉poke里有哪些过敏原，怎么答？")
         assert plan.intent != "refusal"
+
+
+class TestFollowUpMisclassification:
+    def test_complete_question_is_not_follow_up(self, planner):
+        """指示词开头但含完整疑问结构的句子不是追问（X-F1：猪肉进价）。"""
+        from kbqa.entities import looks_like_follow_up
+
+        assert not looks_like_follow_up("这个月猪肉进价多少钱？")
+        plan = planner.plan("这个月猪肉进价多少钱？")
+        assert plan.intent == "refusal", plan.intent
+
+    def test_true_followups_still_detected(self):
+        from kbqa.entities import looks_like_follow_up
+
+        assert looks_like_follow_up("那 7 月呢？")
+        assert looks_like_follow_up("这家店呢")
+        assert looks_like_follow_up("那 6 月的时候呢？")
