@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import logging
 import time
 from datetime import date
 from typing import Any, Optional
 
 from .answerer import Answerer
 from .schemas import Answer
+from .contracts import enforce_limits
 from .cleaning import build_clean_db
 from .docfacts import DocFacts
 from .config import Settings, load_settings
@@ -228,7 +230,7 @@ class Service:
 
     # -- 工具执行（live 模式下由模型驱动） ---------------------------------------
 
-    def run_tool(self, name: str, params: dict) -> dict:
+    def run_tool(self, name: str, params: dict, *, plan=None, trace=None) -> dict:
         if name not in TOOL_NAMES:
             return {"error": "没有这个工具：%s，可用工具：%s" % (name, "、".join(TOOL_NAMES))}
         schema = next(
@@ -256,7 +258,18 @@ class Service:
                 return {"error": "缺少必填参数 %s" % key}
         try:
             if name == "search_kb":
-                return self.retrieve(cleaned["query"], cleaned.get("top_k", 5))
+                query = cleaned["query"]
+                context = plan or self.planner.plan(query, [])
+                started = time.perf_counter()
+                found = self.retriever.search(
+                    query, top_k=cleaned.get("top_k", 5), as_of=context.as_of,
+                    store_id=context.store_id, year=context.year,
+                    historical=bool(context.slots.get("historical")),
+                    numeric=context.needs_data,
+                )
+                if trace is not None:
+                    trace.step("search", found.as_trace(), started=started)
+                return {"results": [hit.as_result() for hit in found.ranked]}
             return getattr(self.tools, name)(**cleaned)
         except (TypeError, ValueError) as exc:
             return {"error": "工具 %s 执行失败：%s" % (name, exc)}
@@ -298,7 +311,7 @@ class Service:
             started = time.perf_counter()
             plan = self.planner.plan(question, history)
             trace.step("plan", plan.as_trace(), started=started)
-            answer = self._run_engine(plan, trace, history)
+            answer = enforce_limits(self._run_engine(plan, trace, history), trace)
             self.sessions.append(
                 session_id,
                 {
@@ -310,7 +323,9 @@ class Service:
                 },
             )
             return answer
-        except Exception:  # noqa: BLE001 - 不管里面出什么事，接口都得给个像样的回答
+        except Exception as exc:  # keep the real failure in the trace and logs
+            trace.error("answer", exc)
+            logging.getLogger(__name__).exception("chat failed: %s", trace.trace_id)
             return Answer(
                 answer="抱歉，我暂时无法回答。",
                 answer_type="refusal",

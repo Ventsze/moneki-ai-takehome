@@ -186,10 +186,6 @@ class TestRealQuestions:
             "35" in c["quote"] for c in body["citations"]
         )
 
-    @pytest.mark.xfail(
-        reason="跨语言检索排序未修（止损声明见 DEBUG_LOG），修复后 xfail 应转绿",
-        strict=True,
-    )
     def test_c04_english_email_compensation(self):
         from kbqa.service import Service
 

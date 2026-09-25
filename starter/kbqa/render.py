@@ -153,5 +153,6 @@ def describe_daily(result: dict, scope: str, limit: int = 7) -> str:
     days = result.get("days") or []
     shown = days[:limit]
     pieces = ["%s %s 元" % (day["date"], money(day["net_revenue"])) for day in shown]
-    tail = "（共 %d 天，只列前 %d 天）" % (len(days), len(shown)) if len(days) > len(shown) else ""
+    total = result.get("days_total", len(days))
+    tail = "（共 %d 天，只列前 %d 天）" % (total, len(shown)) if total > len(shown) else ""
     return "%s 每日净营业额：%s。%s" % (scope, "，".join(pieces), tail)

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import copy
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -84,7 +85,8 @@ class LLMClient:
             "messages": len(messages),
             "tools": len(tools or []),
             # 契约 §6：trace 里要看得到发给模型的最终提示词。
-            "prompt": _preview(json.dumps(messages, ensure_ascii=False)),
+            "prompt": json.dumps(messages, ensure_ascii=False),
+            "request": copy.deepcopy(body),
         }
         try:
             response = httpx.post(
@@ -121,6 +123,7 @@ class LLMClient:
             self._note(on_call, record, started)
             raise LLMError("bad_json", "模型返回的不是合法 JSON：%s" % response.text[:200]) from exc
 
+        record["response"] = copy.deepcopy(payload)
         choices = payload.get("choices") or []
         if not choices:
             record.update(error="no_choice")
@@ -138,8 +141,8 @@ class LLMClient:
             has_reasoning=bool(message.get("reasoning_content")),
             usage=payload.get("usage"),
             # 契约 §6：模型原始输出也要留痕。思考过程只留在 trace 里，不进任何对外字段。
-            raw_content=_preview(content),
-            raw_reasoning=_preview(message.get("reasoning_content") or ""),
+            raw_content=content,
+            raw_reasoning=message.get("reasoning_content") or "",
         )
         self._note(on_call, record, started)
 
@@ -164,14 +167,16 @@ class LLMClient:
         on_call: Optional[Any] = None,
     ) -> LLMReply:
         """暂时性故障重试一次，且只在时间预算够的时候重试。"""
+        started = time.perf_counter()
         per_call = min(self.timeout, budget) if budget else self.timeout
         try:
             return self.chat(messages, tools, timeout=per_call, on_call=on_call)
         except LLMError as first:
-            remaining = (budget - per_call) if budget else self.timeout
+            remaining = (budget - (time.perf_counter() - started)) if budget else self.timeout
             if not first.retryable or remaining < 5:
                 raise
             time.sleep(min(1.0, max(0.0, remaining / 60)))
+            remaining = (budget - (time.perf_counter() - started)) if budget else self.timeout
             return self.chat(messages, tools, timeout=min(self.timeout, remaining), on_call=on_call)
 
     @staticmethod

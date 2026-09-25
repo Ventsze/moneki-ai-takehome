@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from contextvars import ContextVar
 from datetime import date
 from typing import Optional
 
@@ -26,6 +27,7 @@ RETRIEVAL_SOFT_GATE = 12.0
 CLARIFY_SCORE = 8.0
 #: 拼进回答的正文最长多少字：一段能读的话，不是把文档倒给用户。
 MAX_CONTEXT_CHARS = 600
+_CALL_TRACE = ContextVar("answer_trace", default=None)
 
 
 class Answerer(HybridAnswers):
@@ -48,11 +50,13 @@ class Answerer(HybridAnswers):
     # -- 基础设施 ---------------------------------------------------------------
 
     def _call(self, evidence: list[dict], name: str, **params) -> dict:
+        started = time.perf_counter()
         result = getattr(self.tools, name)(**params)
-        trimmed = result
-        if name == "daily_metrics" and len(result.get("days", [])) > 31:
-            trimmed = {"days": result["days"][:31], "days_total": len(result["days"])}
-        evidence.append({"tool": name, "params": params, "result": trimmed})
+        record = {"tool": name, "params": params, "result": result}
+        evidence.append(record)
+        trace = _CALL_TRACE.get()
+        if trace is not None:
+            trace.step("tool", record, started=started)
         return result
 
     def _scope(self, plan: Plan, window=None) -> str:
@@ -205,6 +209,13 @@ class Answerer(HybridAnswers):
     # -- 入口 -------------------------------------------------------------------
 
     def answer(self, plan: Plan, trace=None) -> Answer:
+        token = _CALL_TRACE.set(trace)
+        try:
+            return self._answer(plan, trace)
+        finally:
+            _CALL_TRACE.reset(token)
+
+    def _answer(self, plan: Plan, trace=None) -> Answer:
         if plan.intent in ("refusal", "clarify"):
             return Answer(answer=plan.refusal or "无法回答这个问题。", answer_type=plan.intent)
         if plan.kind in ("target", "price", "anomaly"):
@@ -297,6 +308,7 @@ class Answerer(HybridAnswers):
                 end=end,
                 store_id=plan.store_id,
                 product_id=plan.product_id,
+                limit=7,
             )
             text = render.describe_daily(result, scope)
         else:

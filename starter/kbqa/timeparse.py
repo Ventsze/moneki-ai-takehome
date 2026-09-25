@@ -91,7 +91,7 @@ def _clamp_day(year: int, month: int, day: int) -> date:
 def parse_time(text: str, today: date) -> TimeSpec:
     """把问句里的时间说法解析成闭区间。找不到时间就返回空的 TimeSpec。"""
     spec = TimeSpec()
-    cleaned = text.replace(" ", "")
+    cleaned = re.sub(r"(?i)\b[sp]\d{2}(?!\d)", " ", text).replace(" ", "")
     year_match = _YEAR.search(cleaned)
     year = int(year_match.group(1)) if year_match else None
     if "去年" in cleaned:
@@ -277,7 +277,7 @@ def _month_and_day_windows(
 
 def loose_days(text: str) -> list[int]:
     """只说了“8 号”没说月份时，把日号拿出来，交给追问用上一轮的月份补全。"""
-    cleaned = text.replace(" ", "")
+    cleaned = re.sub(r"(?i)\b[sp]\d{2}(?!\d)", " ", text).replace(" ", "")
     if _MONTH.search(cleaned):
         return []
     days = [cn_number(match.group(1)) for match in _DAY.finditer(cleaned)]

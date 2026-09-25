@@ -23,6 +23,11 @@ def test_retrieval_identity_and_large_top_k(svc):
         assert hit['text'] == original.text
     assert len(svc.retrieve('退款', len(chunks))['results']) == len(chunks)
 
+
+def test_cross_document_reference_bridges_bilingual_attachment(svc):
+    hits = svc.retrieve('三文鱼那次断供供应商赔了多少钱', 5)['results']
+    assert any(hit['doc_id'] == 'KB-022' for hit in hits)
+
 def test_filtered_padding_cannot_be_used_as_facts(svc):
     r = svc.retriever.search('退款', top_k=len(svc.index.chunks))
     assert len(r.hits) == len(svc.index.chunks)
@@ -60,7 +65,7 @@ def test_live_cannot_attach_contradictory_citation(svc):
     assert '24' in a.answer and a.citations
 
 def test_live_historical_tool_uses_plan(svc):
-    q='2026年6月外卖订单多久内可以退款？'
+    q='2026年5月外卖订单多久内可以退款？'
     p=svc.planner.plan(q,[])
     r=svc.run_tool('search_kb',{'query':'外卖退款期限'},plan=p,trace=Trace('a',q))
     ids={h['doc_id'] for h in r['results']}
@@ -100,3 +105,21 @@ def test_trace_preserves_entire_llm_exchange(monkeypatch):
     assert call['request']['messages']==messages
     assert call['request']['tools']==tools
     assert call['response']['choices'][0]['message']==message
+
+
+def test_response_limits_fail_closed():
+    from kbqa.contracts import enforce_limits
+    from kbqa.schemas import Answer
+    tr=Trace('limit','q')
+    too_big=Answer('数据很多','data',data_evidence=[{'tool':'example','params':{},'result':{'values':list(range(61))}}])
+    safe=enforce_limits(too_big,tr)
+    assert safe.answer_type=='refusal' and not safe.data_evidence
+    assert tr.steps[-1]['step']=='response_limit'
+
+
+def test_model_cannot_choose_unretrieved_or_obsolete_citation(svc):
+    q='外卖订单多久内可以退款？'
+    a=engine(svc)._finalise(svc.planner.plan(q,[]),'7天内都可退款。[KB-012]',[],
+        {'q':[{'doc_id':'KB-012','chunk_id':'KB-012#1','score':100}]},Trace('a',q))
+    assert all(c['doc_id']!='KB-012' for c in a.citations)
+    assert '24' in a.answer

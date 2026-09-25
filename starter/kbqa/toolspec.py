@@ -28,7 +28,7 @@ TOOLS = [
     _fn(
         "daily_metrics",
         "按天返回区间内每一天的净营业额、订单数、客单价，没有营业额的日期也会出现。",
-        {"start": _DATE, "end": _DATE, "store_id": _STORE, "product_id": _PRODUCT},
+        {"start": _DATE, "end": _DATE, "store_id": _STORE, "product_id": _PRODUCT, "limit": {"type": "integer", "description": "最多返回多少天；问答展示建议7天"}},
         ["start", "end"],
     ),
     _fn(

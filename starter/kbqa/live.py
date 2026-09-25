@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import copy
+import inspect
 import re
 import time
 from typing import Any, Callable
@@ -12,12 +14,11 @@ from .schemas import Answer
 from .llm import LLMClient, LLMError
 from .planner import Plan
 from .toolspec import TOOLS
+from .retriever import Hit, SearchResult
 
 MAX_TOOL_ROUNDS = 4
 MAX_BAD_ARGS = 2
 _DOC_MARK = re.compile(r"[\[【]\s*(KB-\d+)\s*[\]】]")
-_NUMBER = re.compile(r"-?\d+(?:,\d{3})*(?:\.\d+)?")
-_DATE_LIKE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 SYSTEM_PROMPT = """你是一家连锁餐饮公司的经营分析助手，服务对象是运营同事。
 今天固定是 {today}，所有“现在/最近/目前”都以这一天为准。
@@ -93,8 +94,8 @@ class LiveEngine:
                     )
                     continue
                 started = time.perf_counter()
-                result = self.run_tool(name, params)
-                trace.step("tool", {"tool": name, "params": params}, started=started)
+                result = self.run_tool(name, params, plan=plan, trace=trace)
+                trace.step("tool", {"tool": name, "params": params, "result": result}, started=started)
                 if name == "search_kb":
                     retrieved[json.dumps(params, ensure_ascii=False)] = result.get("results", [])
                 elif "error" not in result:
@@ -103,7 +104,7 @@ class LiveEngine:
                     {
                         "role": "tool",
                         "tool_call_id": call.get("id"),
-                        "content": json.dumps(result, ensure_ascii=False)[:6000],
+                        "content": json.dumps(result, ensure_ascii=False),
                     }
                 )
             if round_bad:
@@ -124,88 +125,84 @@ class LiveEngine:
         messages = [{"role": "system", "content": system}]
         for turn in history[-3:]:
             messages.append({"role": "user", "content": turn.get("question", "")})
-            messages.append({"role": "assistant", "content": turn.get("answer", "")})
+            messages.append({"role": "assistant", "content": turn.get("answer", ""), "reasoning_content": ""})
         question = plan.question
         if plan.standalone and plan.standalone != plan.question:
             question += "\n（这是一句追问，完整问题是：%s）" % plan.standalone
         messages.append({"role": "user", "content": question})
         return messages
 
-    def _finalise(
-        self, plan: Plan, content: str, evidence: list[dict], retrieved: dict, trace
-    ) -> Answer:
-        doc_ids = []
-        for match in _DOC_MARK.finditer(content):
-            if match.group(1) not in doc_ids:
-                doc_ids.append(match.group(1))
-        text = _DOC_MARK.sub("", content).strip()
-        citations = self._citations(plan, doc_ids)
-        allowed = self._allowed_numbers(plan, evidence, citations)
-        bad = [value for value in _numbers_in(text) if not _matches(value, allowed)]
-        if bad:
-            trace.step("number_check_failed", {"unmatched": bad[:5]})
-            fallback = self.answerer.answer(plan, trace)
-            fallback.notes.append(
-                "模型回答里的数字 %s 在工具结果里找不到，已改用按工具结果渲染的模板回答。"
-                % "、".join(str(value) for value in bad[:5])
-            )
-            return fallback
-        if not text:
+    def _finalise(self, plan: Plan, content: str, evidence: list[dict], retrieved: dict, trace) -> Answer:
+        """模型选择工具/来源，最终数字绑定字段，事实从有效原文渲染。
+
+        每个请求使用独立 renderer；匹配的工具结果复用，漏查或查错范围则重新查询。
+        模型自由文本仅用于选来源，不作为可发布的事实。
+        """
+        if not content.strip():
             raise LLMError("empty_content", "模型最终回答为空")
-        if evidence and citations:
-            answer_type = "hybrid"
-        elif evidence:
-            answer_type = "data"
-        elif citations:
-            answer_type = "doc"
-        else:
-            answer_type = "refusal"
-        return Answer(
-            answer=text,
-            answer_type=answer_type,
-            citations=citations,
-            data_evidence=evidence,
+        renderer = Answerer(
+            EvidenceTools(self.answerer.tools, evidence), self.answerer.retriever,
+            self.answerer.catalog, self.answerer.today, self.answerer.data_period, self.answerer.facts,
         )
-
-    def _citations(self, plan: Plan, doc_ids: list[str]) -> list[dict]:
-        """引用由代码生成：从模型点名的文档里挑最相关的一句原文，保证逐字可核对。"""
-        citations = []
-        for doc_id in doc_ids[:3]:
-            if doc_id not in self.answerer.retriever.index.docs_meta:
-                continue
-            ranked = self.answerer.facts.rank(plan.search_query or plan.standalone, doc_id, 1)
-            if not ranked:
-                continue
-            citation = self.answerer.facts.cite(doc_id, ranked[0][1].text)
-            if citation:
-                citations.append(citation)
-        return citations
-
-    def _allowed_numbers(self, plan: Plan, evidence: list[dict], citations: list[dict]) -> list[float]:
-        allowed: list[float] = []
-        for item in evidence:
-            allowed.extend(_numbers_in(json.dumps(item, ensure_ascii=False)))
-        for citation in citations:
-            allowed.extend(_numbers_in(self.answerer.retriever.index.texts.get(citation["doc_id"], "")))
-        allowed.extend(_numbers_in(plan.question))
-        allowed.extend(_numbers_in(plan.standalone))
-        if plan.window:
-            allowed.extend(_numbers_in(" ".join(plan.window)))
-        derived = []
-        for value in allowed:
-            derived.extend([round(value, 2), round(value)])
-        return sorted(set(allowed + derived))
-
-
-def _numbers_in(text: str) -> list[float]:
-    values = []
-    for match in _NUMBER.finditer(_DATE_LIKE.sub(lambda m: m.group(0).replace("-", " "), text or "")):
-        try:
-            values.append(float(match.group(0).replace(",", "")))
-        except ValueError:
-            continue
-    return values
+        answer = None
+        selected = set(_DOC_MARK.findall(content))
+        hits, seen = [], set()
+        chunks = {c.chunk_id: c for c in renderer.retriever.index.chunks}
+        for results in retrieved.values():
+            for item in results:
+                chunk = chunks.get(item.get("chunk_id"))
+                doc_id = item.get("doc_id")
+                if not chunk or chunk.doc_id != doc_id or doc_id not in selected or doc_id in seen:
+                    continue
+                if item.get("answerable") is False:
+                    continue
+                if renderer.retriever._eligible(doc_id, plan.as_of or renderer.today, plan.store_id,
+                                                 bool(plan.slots.get("historical"))):
+                    continue
+                seen.add(doc_id)
+                hits.append(Hit(doc_id, chunk.chunk_id, max(float(item.get("score", 0)), 0.01),
+                                chunk.text, chunk.source_text, renderer.retriever.index.docs_meta[doc_id]))
+        if plan.intent == "doc" and hits:
+            result = SearchResult(hits, plan.search_query, [], [], [])
+            body, citations, confidence = renderer._doc_block(plan, result)
+            if citations and not renderer._should_refuse(plan, confidence, max(h.score for h in hits)):
+                answer = Answer(answer=body, answer_type="doc", citations=citations)
+                trace.step("grounded_sources", {"citations": citations, "sources": result.as_trace()})
+        if answer is None:
+            answer = renderer.answer(plan, trace)
+        trace.step("grounded_render", {
+            "strategy": "tool fields and verified source text; free model prose is not published",
+            "answer_type": answer.answer_type, "data_evidence": answer.data_evidence,
+            "citations": answer.citations,
+        })
+        return answer
 
 
-def _matches(value: float, allowed: list[float]) -> bool:
-    return any(abs(value - candidate) <= 0.011 for candidate in allowed)
+class EvidenceTools:
+    """只有工具名与全部默认参数匹配时才复用本轮实际执行结果。"""
+    def __init__(self, tools, evidence):
+        self.tools, self.evidence = tools, evidence
+
+    def __getattr__(self, name):
+        method = getattr(self.tools, name)
+        if not callable(method):
+            return method
+        signature = inspect.signature(method)
+        def normal(params):
+            bound = signature.bind(**params)
+            bound.apply_defaults()
+            return bound.arguments
+        def call(*args, **params):
+            bound = signature.bind(*args, **params)
+            bound.apply_defaults()
+            for item in self.evidence:
+                if item.get("tool") != name or "error" in item.get("result", {}):
+                    continue
+                try:
+                    matches = normal(item.get("params", {})) == bound.arguments
+                except TypeError:
+                    continue
+                if matches:
+                    return copy.deepcopy(item["result"])
+            return method(*args, **params)
+        return call

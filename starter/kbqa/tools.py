@@ -144,7 +144,7 @@ class DataTools:
             "qty": qty,
         }
 
-    def daily_metrics(self, start: str, end: str, store_id=None, product_id=None) -> dict:
+    def daily_metrics(self, start: str, end: str, store_id=None, product_id=None, limit=None) -> dict:
         """区间内每一天都要有一条记录，没有营业额的日期也要出现。"""
         where, params = self._where(start, end, store_id, product_id)
         rows = self.conn.execute(
@@ -173,7 +173,14 @@ class DataTools:
                 }
             )
             cursor += timedelta(days=1)
+        if limit is not None:
+            return {"days": days[:max(1, int(limit))], "days_total": len(days)}
         return {"days": days}
+
+    def zero_revenue_days(self, start: str, end: str, store_id=None, product_id=None) -> dict:
+        daily = self.daily_metrics(start, end, store_id, product_id)
+        days = [d["date"] for d in daily["days"] if d["net_revenue"] == 0]
+        return {"dates": days, "count": len(days)}
 
     def payment_mix(self, start: str, end: str, store_id=None) -> dict:
         """各支付方式的订单数、金额与占比。"""

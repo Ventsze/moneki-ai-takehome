@@ -336,15 +336,10 @@ class HybridAnswers:
         if start == end:
             return ""
         daily = self._call(
-            evidence,
-            "daily_metrics",
-            start=start,
-            end=end,
-            store_id=plan.store_id,
-            product_id=plan.product_id,
+            evidence, "zero_revenue_days", start=start, end=end,
+            store_id=plan.store_id, product_id=plan.product_id,
         )
-        days = daily.get("days") or []
-        zero = [day["date"] for day in days if day["net_revenue"] == 0]
+        zero = daily["dates"]
         if not zero:
             return ""
         return "其中 %s 共 %d 天没有任何营业额。" % ("、".join(zero), len(zero))

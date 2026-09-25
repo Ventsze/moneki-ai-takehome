@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+import re
 from typing import Optional
 
 from .entities import wants_historical
@@ -22,6 +23,9 @@ WINDOW_BOOST = 1.8
 #: 文档级先验：一篇文档整体命中得好，它的其它片段也更可能是答案所在。
 #: 英文邮件里“赔了多少钱”的那一段本身不含任何中文查询词，靠的就是这一项。
 DOC_PRIOR = 0.35
+#: 命中文档明确写着“详见 KB-xxx”时，把被引用文档纳入候选。
+#: 这能连接中文通知与英文附件，也适用于隐藏知识库里的通用交叉引用。
+DOC_LINK_WEIGHT = 0.3
 #: 别名词典本身不是答案，得压一压，不然它永远排第一。
 ALIAS_DOC_PENALTY = 0.5
 #: 周报、纪要里的数字是人工估的，问数字的时候给它们降点权。
@@ -51,6 +55,7 @@ class Hit:
             "chunk_id": self.chunk_id,
             "score": round(self.score, 4),
             "text": self.text,
+            "answerable": not self.padded,
         }
 
 
@@ -79,6 +84,7 @@ class SearchResult:
                     "chunk_id": hit.chunk_id,
                     "score": round(hit.score, 4),
                     "padded": hit.padded,
+                    "text": hit.text,
                     "dropped_instructions": hit.dropped_instructions,
                 }
                 for hit in self.hits
@@ -236,7 +242,9 @@ class Retriever:
             reason = self._eligible(doc_id, as_of, store_id, historical)
             if reason:
                 excluded.add(doc_id)
-                filtered.append({"doc_id": doc_id, "reason": reason})
+                filtered.extend({"doc_id": doc_id, "chunk_id": c.chunk_id, "score": None,
+                                 "text": c.text, "reason": reason}
+                                for c in self.index.chunks if c.doc_id == doc_id)
         # 被元数据过滤淘汰的文档，其片段根本不该进候选池：
         # 契约 §4 禁止“先取 top_k 再过滤”，缺的格子在池内补齐。
         allowed = set(
@@ -249,6 +257,24 @@ class Retriever:
         concepts, expansions = self._concept_scores(query, allowed)
         for position, score in concepts.items():
             scores[position] = scores.get(position, 0.0) + score
+        # 只传播一跳，且权重低于直接词面命中，避免引用链压过正文相关性。
+        direct_best: dict[str, float] = {}
+        for position, score in scores.items():
+            doc_id = self.index.chunks[position].doc_id
+            direct_best[doc_id] = max(direct_best.get(doc_id, 0.0), score)
+        linked_scores: dict[str, float] = {}
+        for source_id, score in direct_best.items():
+            source_text = self.index.texts.get(source_id, "")
+            for target_id in set(re.findall(r"\bKB-\d{3}\b", source_text, re.I)):
+                target_id = target_id.upper()
+                if target_id in self.index.docs_meta and target_id not in excluded:
+                    linked_scores[target_id] = max(
+                        linked_scores.get(target_id, 0.0), score * DOC_LINK_WEIGHT
+                    )
+        for position in allowed:
+            linked = linked_scores.get(self.index.chunks[position].doc_id)
+            if linked:
+                scores[position] = scores.get(position, 0.0) + linked
         best_of_doc: dict[str, float] = {}
         for position, score in scores.items():
             doc_id = self.index.chunks[position].doc_id
@@ -270,7 +296,6 @@ class Retriever:
             )
         adjusted.sort(key=lambda item: (-item[0], item[1]))
 
-        ordered = [self.index.chunks[position] for _, position in adjusted]
         hits: list[Hit] = []
         taken: set[int] = set()
         per_doc: dict[str, int] = {}
@@ -280,9 +305,7 @@ class Retriever:
                 continue
             per_doc[chunk.doc_id] = per_doc.get(chunk.doc_id, 0) + 1
             taken.add(position)
-            hit = self._hit(position, score, filtered)
-            # 第几条命中就取排序里的第几篇文档。
-            hit.doc_id = ordered[len(hits)].doc_id
+            hit = self._hit(position, score, filtered, padded=score <= 0)
             hits.append(hit)
             if len(hits) >= top_k:
                 break
@@ -312,6 +335,14 @@ class Retriever:
             # 契约 §4 还要求“按相关性从高到低”：补齐之后整体再排一次。
             # 每篇文档只占一格是挑片段的规则，不是排序的规则。
             hits.sort(key=lambda hit: -hit.score)
+        # §4 counts all indexed chunks. Ineligible versions are last-resort display
+        # padding only; ranked and model tools must never use them as evidence.
+        if len(hits) < top_k:
+            for position, chunk in enumerate(self.index.chunks):
+                if position not in allowed:
+                    hits.append(self._hit(position, 0.0, filtered, padded=True))
+                    if len(hits) >= top_k:
+                        break
         return SearchResult(
             hits=hits,
             query=query,

@@ -79,7 +79,8 @@
   .chat-samples { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .chat-samples span { font-size: 12px; color: var(--brand); background: var(--brand-soft); border-radius: 14px; padding: 3px 11px; cursor: pointer; }
   .trace-steps { margin: 10px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
-  .trace-steps li { margin: 2px 0; }
+  .trace-steps li { margin: 8px 0; }
+  .trace-steps pre { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f6f7f9; padding: 10px; }
   .trace-steps code { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
   .alert-banner { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
   .alert-banner h2 { color: var(--warn); }
@@ -334,34 +335,45 @@ async function ask(question) {
 }
 
 async function loadTrace(traceId) {
-  const res = await fetch("/api/trace/" + traceId);
-  if (!res.ok) { $("trace-steps").innerHTML = `<li>trace ${esc(traceId)} 不存在</li>`; return; }
-  const trace = await res.json();
-  const steps = trace.steps || [];
-  $("trace-steps").innerHTML =
-    `<li>trace <code>${esc(traceId)}</code> · 共 ${steps.length} 步</li>` +
-    steps.map((s) => `<li>${esc(s.step || s.name || "?")} <code>${(s.ms ?? s.elapsed_ms ?? 0)}ms</code></li>`).join("");
+  const target = $("trace-steps");
+  try {
+    const res = await fetch("/api/trace/" + encodeURIComponent(traceId));
+    if (!res.ok) throw new Error("trace 不存在");
+    const trace = await res.json();
+    const details = (label, value) => `<details><summary>${esc(label)}</summary><pre>${esc(JSON.stringify(value, null, 2))}</pre></details>`;
+    const labels = {plan:"问题规划", search:"检索片段、分数与过滤原因", tool:"数据库/工具调用与结果", response:"响应", grounded_render:"证据约束与最终渲染", grounded_sources:"模型选择的有效来源", answer_mock:"本地作答", answer_live:"模型作答"};
+    target.innerHTML = `<li>trace <code>${esc(traceId)}</code> · 总耗时 ${esc(trace.total_ms)}ms</li>` +
+      (trace.steps || []).map(s => `<li>${esc(labels[s.step] || s.step)} <code>${s.took_ms == null ? "—" : esc(s.took_ms) + "ms"}</code> · 开始后 ${esc(s.at_ms)}ms${details("展开详情", s.detail)}</li>`).join("") +
+      (trace.llm_calls || []).map((call, i) => `<li>模型调用 ${i + 1} · ${esc(call.took_ms)}ms${details("完整请求（提示词、工具定义、每轮消息）", call.request)}${details("模型原始输出（调试用）", call.response || call)} </li>`).join("") +
+      ((trace.errors || []).length ? `<li>${details("错误类型、原因与堆栈", trace.errors)}</li>` : "");
+  } catch (error) {
+    target.innerHTML = `<li>加载调试信息失败：${esc(error.message)}</li>`;
+  }
+}
+
+// 全部日期运算使用UTC午夜，避免本地午夜转ISO时跨日。
+function presetRange(kind, days) {
+  const end = new Date(meta.data_period.end + "T00:00:00Z");
+  if (days) {
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - Number(days) + 1);
+    return [start.toISOString().slice(0, 10), meta.data_period.end];
+  }
+  if (kind === "prev-month") {
+    const d = new Date(meta.today + "T00:00:00Z");
+    d.setUTCDate(1); d.setUTCDate(0);
+    const last = d.toISOString().slice(0, 10);
+    return [last.slice(0, 8) + "01", last];
+  }
+  return [meta.data_period.start, meta.data_period.end];
 }
 
 $("apply").onclick = () => { loadSummary(); loadTrend(); loadTop(); loadCompare(); };
 document.querySelectorAll("#presets span").forEach((el) => {
   el.onclick = () => {
-    const end = new Date(meta.data_period.end + "T00:00:00");
-    if (el.dataset.days) {
-      const start = new Date(end);
-      start.setDate(start.getDate() - Number(el.dataset.days) + 1);
-      $("f-start").value = start.toISOString().slice(0, 10);
-      $("f-end").value = meta.data_period.end;
-    } else if (el.dataset.preset === "current") {
-      $("f-start").value = meta.data_period.start;
-      $("f-end").value = meta.data_period.end;
-    } else if (el.dataset.preset === "prev-month") {
-      const d = new Date(end);
-      d.setDate(1); d.setDate(d.getDate() - 1);
-      const last = d.toISOString().slice(0, 10);
-      $("f-start").value = last.slice(0, 8) + "01";
-      $("f-end").value = last;
-    }
+    const [start, end] = presetRange(el.dataset.preset, el.dataset.days);
+    $("f-start").value = start;
+    $("f-end").value = end;
     loadSummary(); loadTrend(); loadTop(); loadCompare();
   };
 });
