@@ -227,3 +227,21 @@ class TestRetrieveTopK:
             "/api/retrieve", json={"query": "外卖订单多久内可以申请退款", "top_k": 5}
         ).json()
         assert len(body["results"]) == 5
+
+
+class TestTableRowRender:
+    def test_table_units_carry_header(self):
+        """Markdown 表格的数据行要带表头，渲染时才写得出字段名。"""
+        from kbqa.service import Service
+
+        service = Service()
+        units = service.facts.store.units("KB-040")
+        rows = [u for u in units if u.text.strip().startswith("| P06")]
+        assert rows and rows[0].kind == "table"
+        assert "麸质" in rows[0].header and "芝麻" in rows[0].header
+
+    def test_c02_answer_names_allergens(self):
+        from kbqa.service import Service
+
+        body = Service().chat("c02", "有顾客问牛肉poke里有哪些过敏原，怎么答？")
+        assert "麸质" in body["answer"] and "芝麻" in body["answer"]
