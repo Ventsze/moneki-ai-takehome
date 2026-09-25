@@ -193,3 +193,27 @@ class TestRealQuestions:
         assert any(c["doc_id"] == "KB-022" for c in body["citations"])
         joined = body["answer"] + "".join(c["quote"] for c in body["citations"])
         assert "8,600" in joined or "8600" in joined
+
+
+class TestVersionStatus:
+    def test_meta_exposes_status(self):
+        from kbqa.service import Service
+
+        meta = Service().retriever.index.docs_meta["KB-012"]
+        assert meta.get("status") == "已废止"
+
+    def test_superseded_doc_excluded_by_default(self):
+        from datetime import date
+
+        from kbqa.service import Service
+
+        service = Service()
+        reason = service.retriever._eligible("KB-012", date(2026, 9, 1), None, False)
+        assert reason, "已废止文档在默认路径必须被排除"
+
+    def test_c01_uses_current_refund_window(self):
+        from kbqa.service import Service
+
+        body = Service().chat("c01", "外卖订单多久内可以申请退款？")
+        assert any(c["doc_id"] == "KB-013" for c in body["citations"])
+        assert "24" in body["answer"]
