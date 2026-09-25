@@ -2,9 +2,9 @@
 
 一个给连锁餐饮运营用的系统：数据看板（指标/趋势/榜单/数据质量）+ 一个能同时查
 数据库与公司文档的 AI 助手。在 starter（前同事留下的 RAG 服务）基础上定位并修复了
-20 处缺陷，补齐混合问答链路、前端看板、安全约束与运营预警。
+20 处 starter 缺陷，并在提交审计中继续修复 11 处检索、日期、grounding、trace 与响应边界问题，补齐混合问答链路、前端看板、安全约束与运营预警。
 
-**公开题库 97.0 / 100**（无 Key 降级模式，53/55 题全绿），轨迹见 `EVAL_REPORT.md`；
+**公开题库 100.0 / 100**（无 Key 降级模式，55/55 题全绿），轨迹见 `EVAL_REPORT.md`；
 缺陷逐条台账见 `DEBUG_LOG.md`；大模型接入见 `LLM_SETUP.md`（预检 14/14）。
 
 ## 三步跑起来
@@ -18,7 +18,7 @@ make rebuild        # 从 ../data 与 ../knowledge_base 重建清洗表和检索
 make run            # 服务起在 http://localhost:8000，看板直接浏览器打开
 ```
 
-跑测试：`make test`（88 个用例）；自命题回归题库 `eval/my_questions.jsonl`（10 题）与
+跑测试：`make test`（109 个用例）；自命题回归题库 `eval/my_questions.jsonl`（10 题）与
 公开题库均接进 CI（`.github/workflows/ci.yml`，push/PR 自动跑，破线禁止合并）。
 跑公开题库（另开终端，回到根目录）：
 
@@ -115,7 +115,7 @@ python3 eval/run_eval.py --base-url http://localhost:8000 --questions eval/publi
 
 ## 已知边界
 
-- C04/R04（英文邮件检索，共 3 分）未修：跨语言词面重叠问题的通用解需要引入
-  翻译/嵌入，针对此题硬编码映射属于过拟合公开题库，取舍见 `DEBUG_LOG.md` 止损声明。
+- live 模式已通过本地 OpenAI 兼容网关的 14 项、32 次问答预检；真实供应商模型的输出质量、
+  配额与网络延迟取决于评审环境。模型输出仍需通过本地工具、引用核验和响应上限后才会发布。
 - 其余说明：`LLM_SETUP.md`（模型接入）、`AI_USAGE.md`（AI 协作过程）、
   `DEMO.md`（演示脚本）、`TASK.md`（原作业说明，未改动）。

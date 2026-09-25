@@ -59,12 +59,12 @@ curl -s http://localhost:8000/api/health | grep llm_mode   # 期望 "live"
 
    ```bash
    python3 eval/llm_gateway.py proxy --upstream https://api.deepseek.com --port 9000
-   export LLM_BASE_URL=http://127.0.0.1:9000
-   # 用这三个变量（proxy 会打印）重启服务后，所有请求原文都在 proxy 终端输出里
+   export LLM_BASE_URL=http://127.0.0.1:9000/ds-gw
+   # 以 proxy 启动后打印的完整 Base URL 为准；重启服务后，请求原文写入 llm_traffic.jsonl
    ```
 
 2. **trace**：每次 `/api/chat` 的 `trace_id` 对应 `/api/trace/{trace_id}`，其中记录了
-   逐轮工具调用与结果、LLM 调用的消息数与提示词预览（`llm` 步骤）。前端看板的
+   逐轮工具调用与结果、完整 LLM 请求和原始响应（`llm` 步骤）。前端看板的
    AI 助手面板会直接展示这条时间线。
 
 样例（proxy 输出，脱敏截断）：
@@ -84,7 +84,7 @@ curl -s http://localhost:8000/api/health | grep llm_mode   # 期望 "live"
 - `/api/chat`：规划、检索、取数照常运行，由本地作答引擎渲染答案
   （`llm_mode=mock` 时预检 P8/P9/P11 验证：32 次问答全部 200、字段完整、从无空串）。
   模型不可用的场景一律返回结构化 `refusal`（带 `trace_id`），绝不 HTTP 500、绝不编数字。
-- 评测分数：公开题库 97.0 就是无 Key 模式跑的（见 `EVAL_REPORT.md`）。
+- 评测分数：公开题库 100.0 就是无 Key 模式跑的（见 `EVAL_REPORT.md`）。
 
 ## 6. 依赖与安装
 
@@ -108,7 +108,7 @@ P7    工具定义规范，且每一个工具调用都以 role=tool + tool_call_
 P8    每个场景下 /api/chat 都返回 HTTP 200 与字段完整的合法 JSON        通过  32 次问答全部返回 200 和字段完整的 JSON。
 P9    模型不可用时给出结构化 refusal，answer 从不是空串                 通过  结构化 refusal 或有据可查的回答，answer 从不是空串。
 P10   思考内容没有漏进 answer / citations / data_evidence               通过  32 次回答里，思考标记都没有出现在任何对外字段里。
-P11   /api/chat 在时限内返回（含长时间无响应的场景）                    通过  最慢 120.04 秒，都在 180 秒以内。
+P11   /api/chat 在时限内返回（含长时间无响应的场景）                    通过  最慢 120.03 秒，都在 180 秒以内。
 P12   注入环境变量后 /api/health 报告 llm_mode = live                   通过  llm_mode = live。
 P13   多轮工具调用之间 reasoning_content 原样回传（没有触发 400）       通过  18 次多轮请求都原样回传了 reasoning_content。
 P14   保持连接的空行与 SSE 注释没有把服务弄坏                           通过  空行与 `: keep-alive` 注释被正确跳过，slow 场景照常回答。
@@ -116,7 +116,7 @@ P14   保持连接的空行与 SSE 注释没有把服务弄坏                  
 预检通过：在 OpenAI 兼容这条路线上，我们能原样接上你的服务。
 ```
 
-完整原始输出见 `preflight_report.md`（`starter/` 目录，随仓库提交）。
+完整原始输出见 `docs/validation/final-preflight/preflight_report.md`。
 
 ## 8. 契约 §7.3 行为对照表
 
@@ -130,4 +130,4 @@ P14   保持连接的空行与 SSE 注释没有把服务弄坏                  
 | 不用文档外参数 | 未使用 `seed`/`n`/`parallel_tool_calls` 等（P4） |
 | 繁忙时空行 / `: keep-alive` 注释 | httpx 标准解析天然跳过（P14 显式验证） |
 | 错误码 400/401/402/422/429/500/503 | 全部映射为结构化 refusal + trace 记录，可重试的做有限重试（P8/P9 覆盖 402/422/429/500/503 场景） |
-| 180 秒总预算 | 每次调用超时 = min(120s, 剩余预算)；预算耗尽返回 refusal（P11：最慢 120.04s < 180s） |
+| 180 秒总预算 | 每次调用超时 = min(120s, 剩余预算)；预算耗尽返回 refusal（P11：最慢 120.03s < 180s） |

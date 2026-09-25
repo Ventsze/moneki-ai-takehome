@@ -1,0 +1,650 @@
+{
+  "generated_at": "2026-09-25 21:44:44",
+  "base_url": "http://127.0.0.1:18765",
+  "questions_file": "/Users/wenze/Developer/moneki-ai-takehome-main/eval/my_questions.jsonl",
+  "kb_dir": "/Users/wenze/Developer/moneki-ai-takehome-main/knowledge_base",
+  "kb_docs_loaded": 35,
+  "timeout": 180.0,
+  "only": null,
+  "total": {
+    "points": 18.0,
+    "earned": 18.0,
+    "ratio": 1.0,
+    "questions": 10,
+    "passed": 10
+  },
+  "per_category": {
+    "metrics": {
+      "points": 2.0,
+      "earned": 2.0,
+      "questions": 2,
+      "passed": 2,
+      "ratio": 1.0
+    },
+    "retrieval": {
+      "points": 2.0,
+      "earned": 2.0,
+      "questions": 2,
+      "passed": 2,
+      "ratio": 1.0
+    },
+    "doc": {
+      "points": 4.0,
+      "earned": 4.0,
+      "questions": 2,
+      "passed": 2,
+      "ratio": 1.0
+    },
+    "hybrid": {
+      "points": 3.0,
+      "earned": 3.0,
+      "questions": 1,
+      "passed": 1,
+      "ratio": 1.0
+    },
+    "multi_turn": {
+      "points": 3.0,
+      "earned": 3.0,
+      "questions": 1,
+      "passed": 1,
+      "ratio": 1.0
+    },
+    "refusal": {
+      "points": 4.0,
+      "earned": 4.0,
+      "questions": 2,
+      "passed": 2,
+      "ratio": 1.0
+    }
+  },
+  "latency_seconds": {
+    "median": 0.004,
+    "max": 0.025,
+    "total": 0.094
+  },
+  "health": {
+    "status": "ok",
+    "llm_mode": "mock",
+    "kb_docs": 35,
+    "kb_chunks": 124,
+    "valid_sales_rows": 18290,
+    "today": "2026-09-01",
+    "data_period": {
+      "start": "2026-05-01",
+      "end": "2026-08-31"
+    },
+    "cleaning_report": {
+      "raw_rows": 18628,
+      "removed": {
+        "1_unparseable_date": 8,
+        "2_empty_amount": 150,
+        "3_qty_le_zero": 30,
+        "4_store_not_in_stores": 10,
+        "5_product_not_in_products": 40,
+        "6_duplicate_row": 100,
+        "note_unparseable_amount": 0
+      },
+      "kept_rows": 18290,
+      "kept_sales_rows": 18196,
+      "kept_refund_rows": 94
+    },
+    "index_key": "e7d3b9001a08",
+    "kb_warnings": [
+      "跳过没有 KB 编号的文件：README.md"
+    ]
+  },
+  "health_error": null,
+  "metrics_baselines": {},
+  "metrics_baseline_errors": {},
+  "kb_errors": [],
+  "questions": [
+    {
+      "id": "X-M1",
+      "category": "metrics",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "latency_seconds": 0.004,
+      "turns": [
+        {
+          "question": "GET /api/metrics/summary",
+          "passed": true,
+          "latency_seconds": 0.004,
+          "answer_type": null,
+          "citations": [],
+          "trace_id": null,
+          "answer": "{\"start\": \"2026-06-30\", \"end\": \"2026-06-30\", \"store_id\": null, \"product_id\": null, \"net_revenue\": 4503.0, \"refund_amount\": 76.0, \"orders\": 134, \"aov\": 33.6, \"qty\": 196}",
+          "checks": [
+            {
+              "name": "request",
+              "passed": true
+            },
+            {
+              "name": "expect.aov",
+              "passed": true
+            },
+            {
+              "name": "expect.net_revenue",
+              "passed": true
+            },
+            {
+              "name": "expect.orders",
+              "passed": true
+            },
+            {
+              "name": "expect.qty",
+              "passed": true
+            },
+            {
+              "name": "expect.refund_amount",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-M2",
+      "category": "metrics",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "latency_seconds": 0.004,
+      "turns": [
+        {
+          "question": "GET /api/metrics/summary",
+          "passed": true,
+          "latency_seconds": 0.004,
+          "answer_type": null,
+          "citations": [],
+          "trace_id": null,
+          "answer": "{\"start\": \"2026-08-01\", \"end\": \"2026-08-31\", \"store_id\": \"S05\", \"product_id\": null, \"net_revenue\": 32868.0, \"refund_amount\": 247.0, \"orders\": 935, \"aov\": 35.15, \"qty\": 1447}",
+          "checks": [
+            {
+              "name": "request",
+              "passed": true
+            },
+            {
+              "name": "expect.aov",
+              "passed": true
+            },
+            {
+              "name": "expect.net_revenue",
+              "passed": true
+            },
+            {
+              "name": "expect.orders",
+              "passed": true
+            },
+            {
+              "name": "expect.qty",
+              "passed": true
+            },
+            {
+              "name": "expect.refund_amount",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-R1",
+      "category": "retrieval",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "latency_seconds": 0.004,
+      "turns": [
+        {
+          "question": "换班需要提前多久申请",
+          "passed": true,
+          "latency_seconds": 0.004,
+          "answer_type": null,
+          "citations": [],
+          "trace_id": null,
+          "answer": "[\"KB-016\", \"KB-032\", \"KB-011\", \"KB-061\", \"KB-013\"]",
+          "checks": [
+            {
+              "name": "results_shape",
+              "passed": true
+            },
+            {
+              "name": "results_count",
+              "passed": true
+            },
+            {
+              "name": "gold_all",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-R2",
+      "category": "retrieval",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "latency_seconds": 0.004,
+      "turns": [
+        {
+          "question": "员工用餐打几折",
+          "passed": true,
+          "latency_seconds": 0.004,
+          "answer_type": null,
+          "citations": [],
+          "trace_id": null,
+          "answer": "[\"KB-014\", \"KB-015\", \"KB-029\", \"KB-024\", \"KB-023\"]",
+          "checks": [
+            {
+              "name": "results_shape",
+              "passed": true
+            },
+            {
+              "name": "results_count",
+              "passed": true
+            },
+            {
+              "name": "gold_all",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-C1",
+      "category": "doc",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "latency_seconds": 0.013,
+      "turns": [
+        {
+          "question": "换班需要提前多久申请？",
+          "passed": true,
+          "latency_seconds": 0.013,
+          "answer_type": "doc",
+          "citations": [
+            "KB-016"
+          ],
+          "trace_id": "t-20260901-0001",
+          "answer": "KB-016《排班与考勤制度》（2025-11-01 起生效）：5. 换班需提前 24 小时在排班系统提交，由双方确认、店长批准，不接受口头换班。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "fact_all",
+              "passed": true
+            },
+            {
+              "name": "cite_all",
+              "passed": true
+            },
+            {
+              "name": "quotes_verbatim",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-C2",
+      "category": "doc",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "latency_seconds": 0.022,
+      "turns": [
+        {
+          "question": "三文鱼poke 的供应商是哪家？",
+          "passed": true,
+          "latency_seconds": 0.022,
+          "answer_type": "doc",
+          "citations": [
+            "KB-021",
+            "KB-041"
+          ],
+          "trace_id": "t-20260901-0002",
+          "answer": "KB-021《三文鱼poke 临时停售通知》（2026-07-06 起生效）：6. 顾客询问时统一口径：到货质检不合格，不合格的原料我们不会做给顾客，是主动下架。不展开谈技术细节，不评价供应商。\nKB-041《供应商名录》（2026-04-01 起生效）：Tasman Cold Chain Seafood：主要供应品类 冷链海产，对应商品 三文鱼poke、吞拿鱼三明治，订货提前期 3 天，配送频次 每周二、五各一次，联系人 Daniel Whitcombe，联系电话 021-5555-0201，备注 夜间发车、次日清晨到货；到货必须随车温度记录，中心温度高于 5℃ 拒收。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "fact_all",
+              "passed": true
+            },
+            {
+              "name": "cite_all",
+              "passed": true
+            },
+            {
+              "name": "quotes_verbatim",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-F1",
+      "category": "refusal",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "latency_seconds": 0.003,
+      "turns": [
+        {
+          "question": "这个月猪肉进价多少钱？",
+          "passed": true,
+          "latency_seconds": 0.003,
+          "answer_type": "refusal",
+          "citations": [],
+          "trace_id": "t-20260901-0003",
+          "answer": "这个问题超出了系统能回答的范围：主句问的是天气、预测、外部价格、薪酬这类系统无从知道的事，知识库里也没有找到相应的规定。数据库里只有 2026-05-01 至 2026-08-31 的销售明细，所以我不能回答。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "numbers_none_beyond_question",
+              "passed": true
+            },
+            {
+              "name": "cite_max",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-F2",
+      "category": "refusal",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "latency_seconds": 0.004,
+      "turns": [
+        {
+          "question": "预测一下 9 月的营业额",
+          "passed": true,
+          "latency_seconds": 0.004,
+          "answer_type": "refusal",
+          "citations": [],
+          "trace_id": "t-20260901-0004",
+          "answer": "这个问题超出了系统能回答的范围：主句问的是天气、预测、外部价格、薪酬这类系统无从知道的事，知识库里也没有找到相应的规定。数据库里只有 2026-05-01 至 2026-08-31 的销售明细，所以我不能回答。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "numbers_none_beyond_question",
+              "passed": true
+            },
+            {
+              "name": "cite_max",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-H1",
+      "category": "hybrid",
+      "points": 3.0,
+      "earned": 3.0,
+      "passed": true,
+      "latency_seconds": 0.011,
+      "turns": [
+        {
+          "question": "8 月冷萃乌龙茶的销量达到 900 杯的目标了吗？",
+          "passed": true,
+          "latency_seconds": 0.011,
+          "answer_type": "hybrid",
+          "citations": [
+            "KB-028"
+          ],
+          "trace_id": "t-20260901-0005",
+          "answer": "2026 年 8 月（全部门店）（冷萃乌龙茶）：销量 689 件，净营业额 11024.00 元，有效订单数 461 单，客单价 23.91 元，退款金额 16.00 元。目标为 900 杯（KB-028《新品上市通知：冷萃乌龙茶》（2026-08-01 起生效）），实际 689 杯，未达标，差 211 杯。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "evidence_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "fact_all",
+              "passed": true
+            },
+            {
+              "name": "cite_all",
+              "passed": true
+            },
+            {
+              "name": "quotes_verbatim",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "X-T1",
+      "category": "multi_turn",
+      "points": 3.0,
+      "earned": 3.0,
+      "passed": true,
+      "latency_seconds": 0.025,
+      "turns": [
+        {
+          "question": "6 月的净营业额是多少？",
+          "passed": true,
+          "latency_seconds": 0.011,
+          "answer_type": "data",
+          "citations": [],
+          "trace_id": "t-20260901-0006",
+          "answer": "2026 年 6 月（全部门店）：净营业额 156757.00 元，有效订单数 4311 单，客单价 36.36 元，销量 6496 件，退款金额 953.00 元。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "evidence_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "numbers_all",
+              "passed": true
+            },
+            {
+              "name": "evidence_required",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        },
+        {
+          "question": "那 7 月呢？",
+          "passed": true,
+          "latency_seconds": 0.014,
+          "answer_type": "data",
+          "citations": [],
+          "trace_id": "t-20260901-0007",
+          "answer": "2026 年 7 月（全部门店）：净营业额 162414.00 元，有效订单数 4446 单，客单价 36.53 元，销量 6789 件，退款金额 494.00 元。",
+          "checks": [
+            {
+              "name": "schema",
+              "passed": true
+            },
+            {
+              "name": "answer_length",
+              "passed": true
+            },
+            {
+              "name": "number_flood",
+              "passed": true
+            },
+            {
+              "name": "citation_hygiene",
+              "passed": true
+            },
+            {
+              "name": "evidence_hygiene",
+              "passed": true
+            },
+            {
+              "name": "answer_type_in",
+              "passed": true
+            },
+            {
+              "name": "numbers_all",
+              "passed": true
+            },
+            {
+              "name": "evidence_required",
+              "passed": true
+            },
+            {
+              "name": "trace_required",
+              "passed": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

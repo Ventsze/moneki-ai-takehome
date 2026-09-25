@@ -29,7 +29,7 @@ jobs:
             sleep 1
           done
 
-      - name: 公开题库回归（阈值 95）
+      - name: 公开题库回归（满分 100）
         run: |
           python3 eval/run_eval.py --base-url http://127.0.0.1:8000 \
             --questions eval/public_questions.jsonl
@@ -39,7 +39,7 @@ jobs:
           earned = sum(c["earned"] for c in report["per_category"].values())
           points = sum(c["points"] for c in report["per_category"].values())
           print(f"公开题库：{earned} / {points}")
-          assert earned >= 95, "公开题库分数跌破阈值，禁止合并"
+          assert earned == points, "公开题库回归锚点破线，禁止合并"
           PY
 
       - name: 自命题题库回归（满分 18）
