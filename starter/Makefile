@@ -7,9 +7,9 @@ export DATA_DIR KB_DIR VAR_DIR LLM_BASE_URL LLM_API_KEY LLM_MODEL
 
 .PHONY: setup rebuild run test clean
 
-setup:          ## 建虚拟环境并装依赖
-	uv venv --python 3.12
-	uv pip install --python $(PY) -r requirements.txt
+setup:          ## 建虚拟环境并装依赖（需要 python3.12；装了 uv 也可自行 uv venv）
+	python3.12 -m venv .venv
+	$(PY) -m pip install --quiet -r requirements.txt
 
 rebuild:        ## 从 DATA_DIR 与 KB_DIR 重建清洗表和检索索引
 	$(PY) -m kbqa.rebuild
